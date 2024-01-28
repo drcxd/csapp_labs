@@ -179,7 +179,10 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  int a = 0xAA;
+  a = a << 8 | a;
+  a = a << 16 | a;
+  return !(x + ~a + 1);
 }
 /* 
  * negate - return -x 
@@ -189,7 +192,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  return ~x + 1;
 }
 //3
 /* 
@@ -202,7 +205,9 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  int a = x + ~0x30 + 1;
+  int b = 0x39 + ~x + 1;
+  return !(a >> 31) & !(b >> 31);
 }
 /* 
  * conditional - same as x ? y : z 
@@ -212,7 +217,9 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  int p = !!x;
+  p = ~p + 1;
+  return (p & y) | (~p & z);
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -222,7 +229,9 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  int d = y + ~x + 1;
+  d = d >> 31;
+  return !d;
 }
 //4
 /* 
@@ -234,7 +243,12 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+  x = x >> 16 | x; // 2
+  x = x >> 8 | x; // 4
+  x = x >> 4 | x; // 6
+  x = x >> 2 | x; // 8
+  x = x >> 1 | x; // 10
+  return x & 1 ^ 1; // 12
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -249,6 +263,20 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
+  /** The minimum number of bits is computed as follows: starting from
+      the most significant bit of the number, if the next bit is the
+      same as the most significant bit, then the number of bits
+      required to represent this number minus 1, i.e. the most
+      significant k same bits are counted as 1 bit.
+
+      For example, 12 = 0...01100, then the number of bits required is
+      4 (1100) + 1 (0...0) = 5.
+
+      0x80000000 = 10...0, then the number of bits required is 1 (1) +
+      31 (0...0) = 32.
+  */
+  int mask = 1 << 31;
+  int most_significant_bit = mask & x;
   return 0;
 }
 //float
