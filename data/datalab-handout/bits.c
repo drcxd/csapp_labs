@@ -263,20 +263,22 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  /** The minimum number of bits is computed as follows: starting from
-      the most significant bit of the number, if the next bit is the
-      same as the most significant bit, then the number of bits
-      required to represent this number minus 1, i.e. the most
-      significant k same bits are counted as 1 bit.
-
-      For example, 12 = 0...01100, then the number of bits required is
-      4 (1100) + 1 (0...0) = 5.
-
-      0x80000000 = 10...0, then the number of bits required is 1 (1) +
-      31 (0...0) = 32.
-  */
+  int r = 1;
   int mask = 1 << 31;
-  int most_significant_bit = mask & x;
+  int msb = mask & x;
+  int bit, notsame, add = 0;
+
+  msb = msb | msb >> 1;
+  msb = msb | msb >> 2;
+  msb = msb | msb >> 4;
+  msb = msb | msb >> 8;
+  msb = msb | msb >> 16;
+
+  x = x ^ msb;
+
+  /** now x is in the form of 0...01x...x, we need to compute logx +
+      1 */
+
   return 0;
 }
 //float
