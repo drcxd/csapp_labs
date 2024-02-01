@@ -263,10 +263,8 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  int r = 1;
   int mask = 1 << 31;
   int msb = mask & x;
-  int bit, notsame, add = 0;
 
   msb = msb | msb >> 1;
   msb = msb | msb >> 2;
@@ -278,8 +276,27 @@ int howManyBits(int x) {
 
   /** now x is in the form of 0...01x...x, we need to compute logx +
       1 */
+  int FFFF = 0xFF << 16 | 0xFF;
+  int lg = 0;
+  int shift = !(mask & (x + ~FFFF + 1)) >> 4;
+  lg = lg | shift;
+  x = x >> shift;
 
-  return 0;
+  shift = !(mask & (x + ~0xFF + 1)) >> 3;
+  lg = lg | shift;
+  x = x >> shift;
+
+  shift = !(mask & (x + ~0xF + 1)) >> 2;
+  lg = lg | shift;
+  x = x >> shift;
+
+  shift = !(mask & (x + ~0x3 + 1)) >> 1;
+  lg = lg | shift;
+  x = x >> shift;
+
+  lg = lg | (x >> 1);
+
+  return lg + 1;
 }
 //float
 /* 
