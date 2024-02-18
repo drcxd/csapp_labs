@@ -248,7 +248,7 @@ int logicalNeg(int x) {
   x = x >> 4 | x; // 6
   x = x >> 2 | x; // 8
   x = x >> 1 | x; // 10
-  return x & 1 ^ 1; // 12
+  return (x & 1) ^ 1; // 12
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -265,6 +265,9 @@ int logicalNeg(int x) {
 int howManyBits(int x) {
   int mask = 1 << 31;
   int msb = mask & x;
+  int FFFF = (0xFF << 16) | 0xFF;
+  int lg = 0;
+  int shift = !(mask & (x + ~FFFF + 1)) >> 4;
 
   msb = msb | msb >> 1;
   msb = msb | msb >> 2;
@@ -275,10 +278,7 @@ int howManyBits(int x) {
   x = x ^ msb;
 
   /** now x is in the form of 0...01x...x, we need to compute logx +
-      1 */
-  int FFFF = 0xFF << 16 | 0xFF;
-  int lg = 0;
-  int shift = !(mask & (x + ~FFFF + 1)) >> 4;
+     1 */
   lg = lg | shift;
   x = x >> shift;
 
@@ -311,7 +311,22 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+  int s = uf & 0x80000000;
+  int exp = (uf & 0x7F80000) >> 23;
+  int f = uf & 0x007FFFFF;
+  if (exp == 0xFF) {
+    return uf; /* NaN or infinity */
+  }
+  if (exp != 0xFF && exp != 0) { /* normalized values */
+    exp = exp + 1;
+    if (exp == 0xFF) {
+      return s | (exp << 23);
+    }
+    return s | (exp << 23) | f;
+  }
+  /* denormalized values */
+  return s | (uf << 1);
+  /* return 2; */
 }
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
@@ -326,7 +341,28 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  /* int s = uf & 0x80000000; */
+  int exp = (uf & 0x7F80000) >> 23;
+  int f = uf & 0x007FFFFF;
+  int E = exp - 127; // 127 = 2^7 - 1
+  if (E >= 31) {
+    return 0x80000000;
+    /* NOTE: when E = 31, s != 0, f == 0, the number is in rage, i.e.,
+       1.0 * 2^31, which can be represented using a 32-bit two's
+       complement number. The integer representation is 0x80000000,
+       which is the same as the result when the number exceeds the
+       valid range. */
+  } else if (E >= 0) {
+    f = f | 0x00800000; /* add the implicit leading one */
+    if (E < 23) {
+      f = f >> (23 - E);
+    } else if (E > 23) {
+      f = f << (E - 23);
+    }
+    return f;
+  }
+  /* E < 0 */
+  return 0;
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
@@ -342,5 +378,18 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+  int shift = -126 - x;
+  int exp = x + 127;
+  if (x > 127) {
+    return 0x7F000000; // +INF
+  }
+  if (x < -149) {
+    return 0; // too small
+  }
+  if (x < -126) {
+    // denormalized value
+    return 0x00400000 >> shift;
+  }
+  // normalized value
+  return exp << 23;
 }
