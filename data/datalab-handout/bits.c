@@ -142,8 +142,12 @@ NOTES:
  *   Max ops: 14
  *   Rating: 1
  */
+
 int bitXor(int x, int y) {
-  return ~x & y;
+       int t1 = ~x & y;
+       int t2 = x & ~y;
+       int notr = ~t1 & ~t2;
+       return ~notr;
 }
 /* 
  * tmin - return minimum two's complement integer 
@@ -164,11 +168,11 @@ int tmin(void) {
  */
 int isTmax(int x) {
   /**
-   * !(x + x + 2) = 1 when x = Tmax or -1
+   * !(x + 1 + x + 1) = 1 when x = Tmax or -1
    * !!(~x) = 1 when x != -1
    * ops: 7
    */
-  return !!(~x) & !(x + x + 2);
+  return !!(~x) & !(x + 1 + x + 1);
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -182,7 +186,7 @@ int allOddBits(int x) {
   int a = 0xAA;
   a = a << 8 | a;
   a = a << 16 | a;
-  return !(x + ~a + 1);
+  return !((x & a) + ~a + 1);
 }
 /* 
  * negate - return -x 
@@ -229,9 +233,11 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
+  int sx = (x >> 31) & 1;
+  int sy = (y >> 31) & 1;
   int d = y + ~x + 1;
   d = d >> 31;
-  return !d;
+  return !(!sx & sy) & ((sx & !sy) | !d);
 }
 //4
 /* 
@@ -264,37 +270,30 @@ int logicalNeg(int x) {
  */
 int howManyBits(int x) {
   int mask = 1 << 31;
-  int msb = mask & x;
-  int FFFF = (0xFF << 16) | 0xFF;
+  int msb = x >> 31; // duplicate the MSB on all bits
+  int FFFF = (0xFF << 8) | 0xFF;
   int lg = 0;
-  int shift = !(mask & (x + ~FFFF + 1)) >> 4;
-
-  msb = msb | msb >> 1;
-  msb = msb | msb >> 2;
-  msb = msb | msb >> 4;
-  msb = msb | msb >> 8;
-  msb = msb | msb >> 16;
-
-  x = x ^ msb;
+  int y = x ^ msb;
+  int shift = (!(mask & (y + ~FFFF + 1))) << 4;
 
   /** now x is in the form of 0...01x...x, we need to compute logx +
-     1 */
+     2 */
   lg = lg | shift;
-  x = x >> shift;
+  y = y >> shift;
 
-  shift = !(mask & (x + ~0xFF + 1)) >> 3;
+  shift = (!(mask & (y + ~0xFF + 1))) << 3;
   lg = lg | shift;
-  x = x >> shift;
+  y = y >> shift;
 
-  shift = !(mask & (x + ~0xF + 1)) >> 2;
+  shift = (!(mask & (y + ~0xF + 1))) << 2;
   lg = lg | shift;
-  x = x >> shift;
+  y = y >> shift;
 
-  shift = !(mask & (x + ~0x3 + 1)) >> 1;
+  shift = (!(mask & (y + ~0x3 + 1))) << 1;
   lg = lg | shift;
-  x = x >> shift;
+  y = y >> shift;
 
-  lg = lg | (x >> 1);
+  lg = lg | (y >> 1);
 
   return lg + 1;
 }
