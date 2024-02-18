@@ -274,28 +274,38 @@ int howManyBits(int x) {
   int FFFF = (0xFF << 8) | 0xFF;
   int lg = 0;
   int y = x ^ msb;
-  int shift = (!(mask & (y + ~FFFF + 1))) << 4;
+  int oy = y;
+  int shift = 0;
+  int t = 0;
 
   /** now x is in the form of 0...01x...x, we need to compute logx +
      2 */
+  t = y + ~FFFF + 1;
+  shift = (!(mask & t) & !!t) << 4;
   lg = lg | shift;
   y = y >> shift;
 
-  shift = (!(mask & (y + ~0xFF + 1))) << 3;
+  t = y + ~0xFF + 1;
+  shift = (!(mask & t) & !!t) << 3;
   lg = lg | shift;
   y = y >> shift;
 
-  shift = (!(mask & (y + ~0xF + 1))) << 2;
+  t = y + ~0xF + 1;
+  shift = (!(mask & t) & !!t) << 2;
   lg = lg | shift;
   y = y >> shift;
 
-  shift = (!(mask & (y + ~0x3 + 1))) << 1;
+  t = y + ~0x3 + 1;
+  shift = (!(mask & t) & !!t) << 1;
   lg = lg | shift;
   y = y >> shift;
 
-  lg = lg | (y >> 1);
+  t = y + ~0x1 + 1;
+  shift = (!(mask & t) & !!t);
+  lg = lg | shift;
 
-  return lg + 1;
+  /* -1 and 0 needs special care since lg(0) is not properly defined */
+  return lg + 2 + ~(!oy) + 1;
 }
 //float
 /* 
