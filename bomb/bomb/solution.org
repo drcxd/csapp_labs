@@ -1,0 +1,23 @@
+* Phase 1
+
+Phase 1 is simple. It only compares the input string with a given
+string, which can be inspected in GDB.
+
+* Phase 2
+
+Phase 2 is more complicated. It first invokes the following function
+reads 6 numbers from the input string:
+
+#+begin_src C
+  /**
+   ,* This function reads six numbers using
+   ,* sscanf(str, "%d %d %d %d %d%d", p, p+4, p+8, p+12, p+16, p+20)
+   ,* and returns the number of items read
+   ,*/
+  int read_six_numbers(const char *str, int *p);
+#+end_src
+
+Then it examines the value of the 6 numbers. Each number has to pass
+its test to defuse phase 2.
+
+* Phase 3
