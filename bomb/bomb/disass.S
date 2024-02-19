@@ -1138,7 +1138,7 @@ Disassembly of section .text:
   400f60:	83 f8 01             	cmp    $0x1,%eax
   400f63:	7f 05                	jg     400f6a <phase_3+0x27>
   400f65:	e8 d0 04 00 00       	call   40143a <explode_bomb>
-  400f6a:	83 7c 24 08 07       	cmpl   $0x7,0x8(%rsp)
+  400f6a:	83 7c 24 08 07       	cmpl   $0x7,0x8(%rsp) ; phase_3+0x27
   400f6f:	77 3c                	ja     400fad <phase_3+0x6a>
   400f71:	8b 44 24 08          	mov    0x8(%rsp),%eax
   400f75:	ff 24 c5 70 24 40 00 	jmp    *0x402470(,%rax,8)
@@ -1156,11 +1156,11 @@ Disassembly of section .text:
   400fa4:	eb 18                	jmp    400fbe <phase_3+0x7b>
   400fa6:	b8 47 01 00 00       	mov    $0x147,%eax
   400fab:	eb 11                	jmp    400fbe <phase_3+0x7b>
-  400fad:	e8 88 04 00 00       	call   40143a <explode_bomb>
+  400fad:	e8 88 04 00 00       	call   40143a <explode_bomb> ; phase_3+0x6a
   400fb2:	b8 00 00 00 00       	mov    $0x0,%eax
   400fb7:	eb 05                	jmp    400fbe <phase_3+0x7b>
   400fb9:	b8 37 01 00 00       	mov    $0x137,%eax
-  400fbe:	3b 44 24 0c          	cmp    0xc(%rsp),%eax
+  400fbe:	3b 44 24 0c          	cmp    0xc(%rsp),%eax ; phase_3+0x7b
   400fc2:	74 05                	je     400fc9 <phase_3+0x86>
   400fc4:	e8 71 04 00 00       	call   40143a <explode_bomb>
   400fc9:	48 83 c4 18          	add    $0x18,%rsp
@@ -1169,25 +1169,25 @@ Disassembly of section .text:
 0000000000400fce <func4>:
   400fce:	48 83 ec 08          	sub    $0x8,%rsp
   400fd2:	89 d0                	mov    %edx,%eax
-  400fd4:	29 f0                	sub    %esi,%eax
+  400fd4:	29 f0                	sub    %esi,%eax ; 0xe in eax
   400fd6:	89 c1                	mov    %eax,%ecx
-  400fd8:	c1 e9 1f             	shr    $0x1f,%ecx
-  400fdb:	01 c8                	add    %ecx,%eax
-  400fdd:	d1 f8                	sar    $1,%eax
-  400fdf:	8d 0c 30             	lea    (%rax,%rsi,1),%ecx
+  400fd8:	c1 e9 1f             	shr    $0x1f,%ecx ; 0 in ecx
+  400fdb:	01 c8                	add    %ecx,%eax  ; 0xe in eax
+  400fdd:	d1 f8                	sar    $1,%eax    ; 7 in eax
+  400fdf:	8d 0c 30             	lea    (%rax,%rsi,1),%ecx ; 7 in ecx
   400fe2:	39 f9                	cmp    %edi,%ecx
   400fe4:	7e 0c                	jle    400ff2 <func4+0x24>
   400fe6:	8d 51 ff             	lea    -0x1(%rcx),%edx
   400fe9:	e8 e0 ff ff ff       	call   400fce <func4>
   400fee:	01 c0                	add    %eax,%eax
   400ff0:	eb 15                	jmp    401007 <func4+0x39>
-  400ff2:	b8 00 00 00 00       	mov    $0x0,%eax
+  400ff2:	b8 00 00 00 00       	mov    $0x0,%eax ; if <= 7
   400ff7:	39 f9                	cmp    %edi,%ecx
   400ff9:	7d 0c                	jge    401007 <func4+0x39>
   400ffb:	8d 71 01             	lea    0x1(%rcx),%esi
   400ffe:	e8 cb ff ff ff       	call   400fce <func4>
   401003:	8d 44 00 01          	lea    0x1(%rax,%rax,1),%eax
-  401007:	48 83 c4 08          	add    $0x8,%rsp
+  401007:	48 83 c4 08          	add    $0x8,%rsp ; if >= 7
   40100b:	c3                   	ret
 
 000000000040100c <phase_4>:
@@ -1201,8 +1201,8 @@ Disassembly of section .text:
   40102c:	75 07                	jne    401035 <phase_4+0x29>
   40102e:	83 7c 24 08 0e       	cmpl   $0xe,0x8(%rsp)
   401033:	76 05                	jbe    40103a <phase_4+0x2e>
-  401035:	e8 00 04 00 00       	call   40143a <explode_bomb>
-  40103a:	ba 0e 00 00 00       	mov    $0xe,%edx
+  401035:	e8 00 04 00 00       	call   40143a <explode_bomb> ; phase_4+0x29
+  40103a:	ba 0e 00 00 00       	mov    $0xe,%edx             ; phase_4+0x2e
   40103f:	be 00 00 00 00       	mov    $0x0,%esi
   401044:	8b 7c 24 08          	mov    0x8(%rsp),%edi
   401048:	e8 81 ff ff ff       	call   400fce <func4>
@@ -1210,8 +1210,8 @@ Disassembly of section .text:
   40104f:	75 07                	jne    401058 <phase_4+0x4c>
   401051:	83 7c 24 0c 00       	cmpl   $0x0,0xc(%rsp)
   401056:	74 05                	je     40105d <phase_4+0x51>
-  401058:	e8 dd 03 00 00       	call   40143a <explode_bomb>
-  40105d:	48 83 c4 18          	add    $0x18,%rsp
+  401058:	e8 dd 03 00 00       	call   40143a <explode_bomb> ; phase_4+0x4c
+  40105d:	48 83 c4 18          	add    $0x18,%rsp            ; phase_4+0x51
   401061:	c3                   	ret
 
 0000000000401062 <phase_5>:
@@ -1236,8 +1236,8 @@ Disassembly of section .text:
   4010a4:	48 83 c0 01          	add    $0x1,%rax
   4010a8:	48 83 f8 06          	cmp    $0x6,%rax
   4010ac:	75 dd                	jne    40108b <phase_5+0x29>
-  4010ae:	c6 44 24 16 00       	movb   $0x0,0x16(%rsp)
-  4010b3:	be 5e 24 40 00       	mov    $0x40245e,%esi
+  4010ae:	c6 44 24 16 00       	movb   $0x0,0x16(%rsp) ; construct a string
+  4010b3:	be 5e 24 40 00       	mov    $0x40245e,%esi  ; compare with string at 0x40245e
   4010b8:	48 8d 7c 24 10       	lea    0x10(%rsp),%rdi
   4010bd:	e8 76 02 00 00       	call   401338 <strings_not_equal>
   4010c2:	85 c0                	test   %eax,%eax

@@ -21,3 +21,38 @@ Then it examines the value of the 6 numbers. Each number has to pass
 its test to defuse phase 2.
 
 * Phase 3
+
+The key to solve this phase is to identify the indirect jump.
+
+* Phase 4
+
+This program also reads two numbers.
+
+The first number must be less than or equal to 0xE.
+
+The second number must be 0.
+
+#+begin_src C
+  func4(int x, int y, int z);
+
+  func4(first_number, 0, 0xE); // this must return 0 and it returns 0
+                               // when first_number is 7
+#+end_src
+
+* Phase5
+
+Phase 5 constructs a string "flyers" using the input string. Each
+character inside the input string is used as an index into an array to
+fetch the character of the target string.
+
+Assume the input string is ~str~, the array is ~a~, then: ~a[str[i]]~ is the
+=i=-th character in the target string. Using the array, we can construct
+the input string easily.
+
+| Char | ASCII | Offset |
+| f    |  0x66 |      9 |
+| l    |  0x6C |     15 |
+| y    |  0x79 |     14 |
+| e    |  0x65 |      5 |
+| r    |  0x72 |      6 |
+| s    |  0x73 |      7 |
