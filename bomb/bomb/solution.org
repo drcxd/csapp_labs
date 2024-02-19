@@ -39,7 +39,7 @@ The second number must be 0.
                                // when first_number is 7
 #+end_src
 
-* Phase5
+* Phase 5
 
 Phase 5 constructs a string "flyers" using the input string. Each
 character inside the input string is used as an index into an array to
