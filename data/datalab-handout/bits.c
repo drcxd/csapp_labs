@@ -320,9 +320,9 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  int s = uf & 0x80000000;
-  int exp = (uf & 0x7F80000) >> 23;
-  int f = uf & 0x007FFFFF;
+  unsigned s = uf & 0x80000000;
+  unsigned exp = (uf & 0x7F800000) >> 23;
+  unsigned f = uf & 0x007FFFFF;
   if (exp == 0xFF) {
     return uf; /* NaN or infinity */
   }
@@ -350,9 +350,9 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  /* int s = uf & 0x80000000; */
-  int exp = (uf & 0x7F80000) >> 23;
-  int f = uf & 0x007FFFFF;
+  unsigned s = uf & 0x80000000;
+  unsigned exp = (uf & 0x7F800000) >> 23;
+  unsigned f = uf & 0x007FFFFF;
   int E = exp - 127; // 127 = 2^7 - 1
   if (E >= 31) {
     return 0x80000000;
@@ -367,6 +367,9 @@ int floatFloat2Int(unsigned uf) {
       f = f >> (23 - E);
     } else if (E > 23) {
       f = f << (E - 23);
+    }
+    if (s) {
+      f = f * -1;
     }
     return f;
   }
@@ -390,7 +393,7 @@ unsigned floatPower2(int x) {
   int shift = -126 - x;
   int exp = x + 127;
   if (x > 127) {
-    return 0x7F000000; // +INF
+    return 0x7F800000; // +INF
   }
   if (x < -149) {
     return 0; // too small
