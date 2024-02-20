@@ -56,3 +56,23 @@ the input string easily.
 | e    |  0x65 |      5 |
 | r    |  0x72 |      6 |
 | s    |  0x73 |      7 |
+
+* Phase 6
+
+This is the most complicated phase. It first reads in 6 numbers. It
+ensures all 6 numbers are less than or equal to 6 and they are all
+unique, i.e., no two numbers are the same. Then each of the 6 numbers
+are used to generate a pointer, which points to somewhere inside the
+memory. The program checks the order of the numbers pointed by the 6
+numbers.
+
+The key point is to figure out what is being checked and the
+relationship between the input number and the number being pointed.
+
+| n |      p |  *p |
+| 6 | 6032d0 | 332 |
+| 5 | 6032e0 | 168 |
+| 4 | 6032f0 | 924 |
+| 3 | 603300 | 691 |
+| 2 | 603310 | 477 |
+| 1 | 603320 | 443 |
