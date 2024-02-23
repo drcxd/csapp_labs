@@ -50,3 +50,43 @@ simulate your program, type =../misc/yis src.yo= in =y86-code= directory.
 | Memory     |                               |
 | Write back | R[rB] <- valE                 |
 | PC update  | PC <- valP                    |
+
+* Part C
+
+The following command should be executed in the =pipe= directory.
+
+Test =ncopy.ys=:
+
+#+begin_src shell
+  # Check length
+  make ncopy.yo
+  ./check-len.pl < nocpy.yo
+  # Correctness
+  make VERSION=full
+  ./psim -t sdriver.yo
+  ./psim -t ldriver.yo
+  ../misc/yis sdriver.yo
+  ./correctness.pl
+#+end_src
+
+Test simulator:
+
+#+begin_src shell
+  (cd ../y86-code; make testpsim)
+  # if no iaadq implementation, remove TFLAGS
+  (cd ../ptest; make SIM=../ppe/psim TFLAGS=-i)
+  ./corretness.pl -p
+#+end_src
+
+Benchmark:
+
+#+begin_src shell
+  ./benchmark.pl
+#+end_src
+
+** Record
+
+Initial average: 15.18
+
+First attempt: only modified the source code, using =cmov= to compute
+=count=, removed some redundant instructions. Average: 13.41.
