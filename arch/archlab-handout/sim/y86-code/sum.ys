@@ -21,7 +21,7 @@ main:
 
 sum:
         xorq %rax, %rax
-        irmovq 8, %rdx
+        irmovq $8, %rdx
         andq %rdi, %rdi
         jmp test
 loop:

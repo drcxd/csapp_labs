@@ -37,3 +37,16 @@ This part requires you to implement three functions using Y86-64
 ISA. You can put your implementation in directory =y86-code=. Then, you
 can compile =src.ys= by typing =make src.yo= in the =y86-code= directory. To
 simulate your program, type =../misc/yis src.yo= in =y86-code= directory.
+
+* Part B
+
+| Stage      | iaddq V, rB                   |
+| Fetch      | icode : ifun <- M_1[PC]        |
+|            | rA : rB <- M_1[PC+1]           |
+|            | valC <- M_8[PC+2]              |
+|            | valP <- PC+10                 |
+| Decode     | valA <- valC, valB <- R[rB]   |
+| Execute    | valE <- valB add valA; set CC |
+| Memory     |                               |
+| Write back | R[rB] <- valE                 |
+| PC update  | PC <- valP                    |
