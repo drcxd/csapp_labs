@@ -74,7 +74,7 @@ Test simulator:
 #+begin_src shell
   (cd ../y86-code; make testpsim)
   # if no iaadq implementation, remove TFLAGS
-  (cd ../ptest; make SIM=../ppe/psim TFLAGS=-i)
+  (cd ../ptest; make SIM=../pipe/psim TFLAGS=-i)
   ./corretness.pl -p
 #+end_src
 
@@ -94,7 +94,7 @@ First attempt: only modified the source code, using =cmov= to compute
 Second attempt: adjust the order of some instructions to reduce data
 dependencies between instructions. Average: 12.41.
 
-*** TODO Implement IADDQ
+*** DONE Implement IADDQ
 
 *** TODO Implement BTFNT Branch Prediction
 
