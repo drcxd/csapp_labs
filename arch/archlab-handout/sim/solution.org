@@ -1,0 +1,39 @@
+* Preparation
+
+Read all the documentation provided by the author of the lab.
+
+Install =flex= and =bison= on your computer. They are required to build
+the various tools used by the lab.
+
+Edit =misc/Makefile= and =pipe/Makefile=. Make sure that the compiler
+flags include =-fcommon=.
+
+#+begin_src diff
+  modified   arch/archlab-handout/sim/misc/Makefile
+  @@ -1,6 +1,6 @@
+   CC=gcc
+  -CFLAGS=-Wall -O1 -g
+  -LCFLAGS=-O1
+  +CFLAGS=-Wall -O1 -g -fcommon
+  +LCFLAGS=-O1 -fcommon
+   LEX = flex
+   YACC=bison
+   LEXLIB = -lfl
+  modified   arch/archlab-handout/sim/pipe/Makefile
+  @@ -23,7 +23,7 @@ TKINC=-isystem /usr/include/tcl8.5
+   # flags.
+
+   CC=gcc
+  -CFLAGS=-Wall -O2
+  +CFLAGS=-Wall -O2 -fcommon
+
+   ##################################################
+   # You shouldn't need to modify anything below here
+#+end_src
+
+* Part A
+
+This part requires you to implement three functions using Y86-64
+ISA. You can put your implementation in directory =y86-code=. Then, you
+can compile =src.ys= by typing =make src.yo= in the =y86-code= directory. To
+simulate your program, type =../misc/yis src.yo= in =y86-code= directory.
