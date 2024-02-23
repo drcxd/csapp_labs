@@ -90,3 +90,12 @@ Initial average: 15.18
 
 First attempt: only modified the source code, using =cmov= to compute
 =count=, removed some redundant instructions. Average: 13.41.
+
+Second attempt: adjust the order of some instructions to reduce data
+dependencies between instructions. Average: 12.41.
+
+*** TODO Implement IADDQ
+
+*** TODO Implement BTFNT Branch Prediction
+
+*** TODO Loop Unrolling
