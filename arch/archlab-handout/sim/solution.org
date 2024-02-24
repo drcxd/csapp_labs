@@ -60,7 +60,7 @@ Test =ncopy.ys=:
 #+begin_src shell
   # Check length
   make ncopy.yo
-  ./check-len.pl < nocpy.yo
+  ./check-len.pl < ncopy.yo
   # Correctness
   make VERSION=full
   ./psim -t sdriver.yo
@@ -75,7 +75,7 @@ Test simulator:
   (cd ../y86-code; make testpsim)
   # if no iaadq implementation, remove TFLAGS
   (cd ../ptest; make SIM=../pipe/psim TFLAGS=-i)
-  ./corretness.pl -p
+  ./correctness.pl -p
 #+end_src
 
 Benchmark:
