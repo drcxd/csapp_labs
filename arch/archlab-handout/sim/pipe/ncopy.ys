@@ -18,7 +18,7 @@ ncopy:
         # Loop header
         # xorq %rax,%rax          # count = 0;
         rrmovq %rdx, %r9
-        iaddq $-15, %r9
+        iaddq $-9, %r9
         jmp Test
 
 Loop:
@@ -95,78 +95,112 @@ P9:
 
 P10:
 
-        mrmovq 80(%rdi), %r10     # read val from src...
-        rmmovq %r10, 80(%rsi)     # ...and store it to dst
-        andq %r10, %r10         # val <= 0?
-        jle P11
-        iaddq $1, %rax         # count++
-
-P11:
-
-        mrmovq 88(%rdi), %r10     # read val from src...
-        rmmovq %r10, 88(%rsi)     # ...and store it to dst
-        andq %r10, %r10         # val <= 0?
-        jle P12
-        iaddq $1, %rax         # count++
-
-P12:
-
-        mrmovq 96(%rdi), %r10     # read val from src...
-        rmmovq %r10, 96(%rsi)     # ...and store it to dst
-        andq %r10, %r10         # val <= 0?
-        jle P13
-        iaddq $1, %rax         # count++
-
-P13:
-
-        mrmovq 104(%rdi), %r10     # read val from src...
-        rmmovq %r10, 104(%rsi)     # ...and store it to dst
-        andq %r10, %r10         # val <= 0?
-        jle P14
-        iaddq $1, %rax         # count++
-
-P14:
-
-        mrmovq 112(%rdi), %r10     # read val from src...
-        rmmovq %r10, 112(%rsi)     # ...and store it to dst
-        andq %r10, %r10         # val <= 0?
-        jle P15
-        iaddq $1, %rax         # count++
-
-P15:
-
-        mrmovq 120(%rdi), %r10     # read val from src...
-        rmmovq %r10, 120(%rsi)     # ...and store it to dst
-        andq %r10, %r10         # val <= 0?
-        jle P16
-        iaddq $1, %rax         # count++
-
-P16:
-
-        iaddq $128, %rdi
-        iaddq $128, %rsi
-        iaddq $-16, %rdx
+        iaddq $80, %rdi
+        iaddq $80, %rsi
+        iaddq $-10, %rdx
         rrmovq %rdx, %r9
-        iaddq $-15, %r9
+        iaddq $-9, %r9
 
 Test:
         # andq %rdx,%rdx          # len > 0?
         jg Loop                 # if so, goto Loop:
+        # jmp RTest
 
-        andq %rdx, %rdx
-        jmp STest
-SLoop:
-        mrmovq (%rdi), %r10     # read val from src...
-        iaddq $8, %rdi
-        rmmovq %r10, (%rsi)     # ...and store it to dst
-        andq %r10, %r10         # val <= 0?
-        jle SNeg
-        iaddq $1, %rax         # count++
-SNeg:
-        iaddq $8, %rsi
-        iaddq $-1, %rdx
-STest:
-        jg SLoop
+RStart:
+
+        rrmovq %rdx, %r9
+        iaddq $-3, %r9
+        je R3
+        jl L3
+
+        rrmovq %rdx, %r9
+        iaddq $-6, %r9
+        jl L6
+        je R6
+
+        rrmovq %rdx, %r9
+        iaddq $-8, %r9
+        je R8
+        jl R7
+        jmp R9
+
+L3:
+        rrmovq %rdx, %r9
+        iaddq $-1, %r9
+        je R1
+        jg R2
+        jmp Done
+
+L6:
+
+        rrmovq %rdx, %r9
+        iaddq $-5, %r9
+        jl R4
+        jmp R5
+
+R9:
+        mrmovq 64(%rdi), %r10
+        rmmovq %r10, 64(%rsi)
+        andq %r10, %r10
+        jle R8
+        iaddq $1, %rax
+        
+R8:
+        mrmovq 56(%rdi), %r10
+        rmmovq %r10, 56(%rsi)
+        andq %r10, %r10
+        jle R7
+        iaddq $1, %rax
+
+R7:
+        mrmovq 48(%rdi), %r10
+        rmmovq %r10, 48(%rsi)
+        andq %r10, %r10
+        jle R6
+        iaddq $1, %rax
+        
+R6:
+        mrmovq 40(%rdi), %r10
+        rmmovq %r10, 40(%rsi)
+        andq %r10, %r10
+        jle R5
+        iaddq $1, %rax
+        
+R5:
+        mrmovq 32(%rdi), %r10
+        rmmovq %r10, 32(%rsi)
+        andq %r10, %r10
+        jle R4
+        iaddq $1, %rax
+
+R4:
+        mrmovq 24(%rdi), %r10
+        rmmovq %r10, 24(%rsi)
+        andq %r10, %r10
+        jle R3
+        iaddq $1, %rax
+
+R3:
+        mrmovq 16(%rdi), %r10
+        rmmovq %r10, 16(%rsi)
+        andq %r10, %r10
+        jle R2
+        iaddq $1, %rax
+
+R2:
+        mrmovq 8(%rdi), %r10
+        rmmovq %r10, 8(%rsi)
+        andq %r10, %r10
+        jle R1
+        iaddq $1, %rax
+
+R1:
+        mrmovq (%rdi), %r10
+        rmmovq %r10, (%rsi)
+        andq %r10, %r10
+        jle Done
+        iaddq $1, %rax
+
 
 ##################################################################
 # Do not modify the following section of code
