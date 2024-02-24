@@ -18,24 +18,23 @@ ncopy:
         # Loop header
         xorq %rax,%rax          # count = 0;
         irmovq $1, %r8
+        andq %rdx, %rdx
         jmp Test
 
 Loop:
         mrmovq (%rdi), %r10     # read val from src...
-        iaddq $-1, %rdx
         iaddq $8, %rdi
-
-        xorq %rcx, %rcx
-
         rmmovq %r10, (%rsi)     # ...and store it to dst
         iaddq $8, %rsi
 
+        xorq %rcx, %rcx
         andq %r10, %r10         # val <= 0?
         cmovg %r8, %rcx
         addq %rcx, %rax         # count++
+        iaddq $-1, %rdx
 
 Test:
-        andq %rdx,%rdx          # len > 0?
+        # andq %rdx,%rdx          # len > 0?
         jg Loop                 # if so, goto Loop:
 ##################################################################
 # Do not modify the following section of code
