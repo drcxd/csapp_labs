@@ -96,6 +96,11 @@ dependencies between instructions. Average: 12.41.
 
 *** DONE Implement IADDQ
 
-*** TODO Implement BTFNT Branch Prediction
+*** DONE Implement BTFNT Branch Prediction
 
-*** TODO Loop Unrolling
+Implement this actually does not help much, because currently most
+predication is correct.
+
+*** DONE Loop Unrolling
+
+Unroll the loop 8x1 times does not improve much.
