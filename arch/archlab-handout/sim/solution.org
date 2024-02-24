@@ -104,3 +104,47 @@ predication is correct.
 *** DONE Loop Unrolling
 
 Unroll the loop 8x1 times does not improve much.
+
+** Implement Load Forwarding
+
+To eliminate the stall introduced between the two instructions:
+
+#+begin_example
+        mrmovq 96(%rdi), %r10     # read val from src...
+        rmmovq %r10, 96(%rsi)     # ...and store it to dst
+#+end_example
+
+We have to complete homework problems 4.57.
+
+I have found a [[https://dreamanddead.github.io/CSAPP-3e-Solutions/chapter4/4.57/][solution]], but I feel it is difficult to understand.
+
+My own solution is different and I think it is more accurate than the
+above one.
+
+First, the condition of a LOAD/USE hazard when there is load
+forwarding implemented. The essence of the LOAD/USE hazard with load
+forwarding enabled is:
+
+The value of the destination register of instruction =mrmovq= or =popq= is
+used in the execute stage of the next instruction. Analyzing each
+Y86-64 instruction one by one, one can find out that the following
+instructions might use the value of an register in its execute stage:
+
++ =opq=: both the source and destination operand
++ =rrmovq=: only the source operand
++ =rmmovq=: only the destination operand, it is =RB= in Y86-64
++ =mrmovq=: only the source operand, it is =RB= in Y86-64
++ =ret=: when =mrmovq= or =popq= writes to =%rsp=
++ =iaddq=: only the destination operand
+
+The condition of a LOAD/USE hazard can be obtained from the above
+list.
+
+To forward the value read from memory in a =mrmovq= or =popq= instruction:
+
+#+begin_example
+word e_valA = [
+        E_icode in { IRMMOVQ, IPUSHQ } && E_srcA == M_dstM : m_valM;
+	1 : E_valA;  # Use valA from stage pipe register
+];
+#+end_example
