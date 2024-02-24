@@ -16,10 +16,8 @@ ncopy:
 ##################################################################
 # You can modify this portion
         # Loop header
-        # xorq %rax,%rax          # count = 0;
-        rrmovq %rdx, %r9
-        iaddq $-9, %r9
-        jmp Test
+        iaddq $-10, %rdx
+        jl RStart
 
 Loop:
         mrmovq (%rdi), %r10     # read val from src...
@@ -98,43 +96,32 @@ P10:
         iaddq $80, %rdi
         iaddq $80, %rsi
         iaddq $-10, %rdx
-        rrmovq %rdx, %r9
-        iaddq $-9, %r9
-
-Test:
-        # andq %rdx,%rdx          # len > 0?
-        jg Loop                 # if so, goto Loop:
-        # jmp RTest
+        jge Loop
 
 RStart:
 
-        rrmovq %rdx, %r9
-        iaddq $-3, %r9
-        je R3
+        iaddq $7, %rdx
         jl L3
+        je R3
 
-        rrmovq %rdx, %r9
-        iaddq $-6, %r9
+        iaddq $-3, %rdx
         jl L6
         je R6
 
-        rrmovq %rdx, %r9
-        iaddq $-8, %r9
+        iaddq $-2, %rdx
         je R8
         jl R7
         jmp R9
 
 L3:
-        rrmovq %rdx, %r9
-        iaddq $-1, %r9
+        iaddq $2, %rdx
         je R1
         jg R2
-        jmp Done
+        ret
 
 L6:
 
-        rrmovq %rdx, %r9
-        iaddq $-5, %r9
+        iaddq $1, %rdx
         jl R4
         jmp R5
 
