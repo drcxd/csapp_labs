@@ -16,91 +16,138 @@ ncopy:
 ##################################################################
 # You can modify this portion
         # Loop header
-        xorq %rax,%rax          # count = 0;
-        irmovq $1, %r8
-        # andq %rdx, %rdx
+        # xorq %rax,%rax          # count = 0;
         rrmovq %rdx, %r9
-        iaddq $-7, %r9
+        iaddq $-15, %r9
         jmp Test
 
 Loop:
         mrmovq (%rdi), %r10     # read val from src...
-        iaddq $8, %rdi
         rmmovq %r10, (%rsi)     # ...and store it to dst
-        iaddq $8, %rsi
-        xorq %rcx, %rcx
         andq %r10, %r10         # val <= 0?
-        cmovg %r8, %rcx
-        addq %rcx, %rax         # count++
+        jle P1
+        iaddq $1, %rax         # count++
 
-        mrmovq (%rdi), %r10     # read val from src...
-        iaddq $8, %rdi
-        rmmovq %r10, (%rsi)     # ...and store it to dst
-        iaddq $8, %rsi
-        xorq %rcx, %rcx
+P1:
+        mrmovq 8(%rdi), %r10     # read val from src...
+        rmmovq %r10, 8(%rsi)     # ...and store it to dst
         andq %r10, %r10         # val <= 0?
-        cmovg %r8, %rcx
-        addq %rcx, %rax         # count++
+        jle P2
+        iaddq $1, %rax         # count++
 
-        mrmovq (%rdi), %r10     # read val from src...
-        iaddq $8, %rdi
-        rmmovq %r10, (%rsi)     # ...and store it to dst
-        iaddq $8, %rsi
-        xorq %rcx, %rcx
+P2:
+        mrmovq 16(%rdi), %r10     # read val from src...
+        rmmovq %r10, 16(%rsi)     # ...and store it to dst
         andq %r10, %r10         # val <= 0?
-        cmovg %r8, %rcx
-        addq %rcx, %rax         # count++
+        jle P3
+        iaddq $1, %rax         # count++
 
-        mrmovq (%rdi), %r10     # read val from src...
-        iaddq $8, %rdi
-        rmmovq %r10, (%rsi)     # ...and store it to dst
-        iaddq $8, %rsi
-        xorq %rcx, %rcx
+P3:
+        mrmovq 24(%rdi), %r10     # read val from src...
+        rmmovq %r10, 24(%rsi)     # ...and store it to dst
         andq %r10, %r10         # val <= 0?
-        cmovg %r8, %rcx
-        addq %rcx, %rax         # count++
+        jle P4
+        iaddq $1, %rax         # count++
 
-        mrmovq (%rdi), %r10     # read val from src...
-        iaddq $8, %rdi
-        rmmovq %r10, (%rsi)     # ...and store it to dst
-        iaddq $8, %rsi
-        xorq %rcx, %rcx
+P4:
+        mrmovq 32(%rdi), %r10     # read val from src...
+        rmmovq %r10, 32(%rsi)     # ...and store it to dst
         andq %r10, %r10         # val <= 0?
-        cmovg %r8, %rcx
-        addq %rcx, %rax         # count++
+        jle P5
+        iaddq $1, %rax         # count++
 
-        mrmovq (%rdi), %r10     # read val from src...
-        iaddq $8, %rdi
-        rmmovq %r10, (%rsi)     # ...and store it to dst
-        iaddq $8, %rsi
-        xorq %rcx, %rcx
+P5:
+        mrmovq 40(%rdi), %r10     # read val from src...
+        rmmovq %r10, 40(%rsi)     # ...and store it to dst
         andq %r10, %r10         # val <= 0?
-        cmovg %r8, %rcx
-        addq %rcx, %rax         # count++
+        jle P6
+        iaddq $1, %rax         # count++
 
-        mrmovq (%rdi), %r10     # read val from src...
-        iaddq $8, %rdi
-        rmmovq %r10, (%rsi)     # ...and store it to dst
-        iaddq $8, %rsi
-        xorq %rcx, %rcx
+P6:
+        mrmovq 48(%rdi), %r10     # read val from src...
+        rmmovq %r10, 48(%rsi)     # ...and store it to dst
         andq %r10, %r10         # val <= 0?
-        cmovg %r8, %rcx
-        addq %rcx, %rax         # count++
+        jle P7
+        iaddq $1, %rax         # count++
 
-        mrmovq (%rdi), %r10     # read val from src...
-        iaddq $8, %rdi
-        rmmovq %r10, (%rsi)     # ...and store it to dst
-        iaddq $8, %rsi
-        xorq %rcx, %rcx
+P7:
+        mrmovq 56(%rdi), %r10     # read val from src...
+        rmmovq %r10, 56(%rsi)     # ...and store it to dst
         andq %r10, %r10         # val <= 0?
-        cmovg %r8, %rcx
-        addq %rcx, %rax         # count++
+        jle P8
+        iaddq $1, %rax         # count++
 
-        iaddq $-8, %rdx
+P8:
+
+        mrmovq 64(%rdi), %r10     # read val from src...
+        rmmovq %r10, 64(%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P9
+        iaddq $1, %rax         # count++
+
+P9:
+
+        mrmovq 72(%rdi), %r10     # read val from src...
+        rmmovq %r10, 72(%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P10
+        iaddq $1, %rax         # count++
+
+P10:
+
+        mrmovq 80(%rdi), %r10     # read val from src...
+        rmmovq %r10, 80(%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P11
+        iaddq $1, %rax         # count++
+
+P11:
+
+        mrmovq 88(%rdi), %r10     # read val from src...
+        rmmovq %r10, 88(%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P12
+        iaddq $1, %rax         # count++
+
+P12:
+
+        mrmovq 96(%rdi), %r10     # read val from src...
+        rmmovq %r10, 96(%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P13
+        iaddq $1, %rax         # count++
+
+P13:
+
+        mrmovq 104(%rdi), %r10     # read val from src...
+        rmmovq %r10, 104(%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P14
+        iaddq $1, %rax         # count++
+
+P14:
+
+        mrmovq 112(%rdi), %r10     # read val from src...
+        rmmovq %r10, 112(%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P15
+        iaddq $1, %rax         # count++
+
+P15:
+
+        mrmovq 120(%rdi), %r10     # read val from src...
+        rmmovq %r10, 120(%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P16
+        iaddq $1, %rax         # count++
+
+P16:
+
+        iaddq $128, %rdi
+        iaddq $128, %rsi
+        iaddq $-16, %rdx
         rrmovq %rdx, %r9
-        iaddq $-7, %r9
-
-        # iaddq $-1, %rdx
+        iaddq $-15, %r9
 
 Test:
         # andq %rdx,%rdx          # len > 0?
@@ -112,11 +159,11 @@ SLoop:
         mrmovq (%rdi), %r10     # read val from src...
         iaddq $8, %rdi
         rmmovq %r10, (%rsi)     # ...and store it to dst
-        iaddq $8, %rsi
-        xorq %rcx, %rcx
         andq %r10, %r10         # val <= 0?
-        cmovg %r8, %rcx
-        addq %rcx, %rax         # count++
+        jle SNeg
+        iaddq $1, %rax         # count++
+SNeg:
+        iaddq $8, %rsi
         iaddq $-1, %rdx
 STest:
         jg SLoop
