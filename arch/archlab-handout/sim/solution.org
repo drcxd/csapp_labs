@@ -53,6 +53,8 @@ simulate your program, type =../misc/yis src.yo= in =y86-code= directory.
 
 * Part C
 
+** How to Test Your Solution
+
 The following command should be executed in the =pipe= directory.
 
 Test =ncopy.ys=:
@@ -84,51 +86,53 @@ Benchmark:
   ./benchmark.pl
 #+end_src
 
-** Record
+** Comment on the 60/60 Solution
 
-Initial average: 15.18
+*** Changes to the Simulator
 
-First attempt: only modified the source code, using =cmov= to compute
-=count=, removed some redundant instructions. Average: 13.41.
+**** Implement IIADDQ
 
-Second attempt: adjust the order of some instructions to reduce data
-dependencies between instructions. Average: 12.41.
+The instruction =iaddq= should be implemented. It can reduce the number
+of instructions used to add a constant to a register. For example:
 
-*** DONE Implement IADDQ
+#+begin_example
+irmovq $8, %rcx
+addq %rcx, %rax
+#+end_example
 
-*** DONE Implement BTFNT Branch Prediction
+can be replaced with a single instruction:
 
-Implement this actually does not help much, because currently most
-predication is correct.
+#+begin_example
+iaddq $8, %rax
+#+end_example
 
-*** DONE Loop Unrolling
+**** Implement LOAD Forwarding
 
-Unroll the loop 8x1 times does not improve much.
-
-** Implement Load Forwarding
-
-To eliminate the stall introduced between the two instructions:
+In the original simulator, to handle LOAD/USE hazard, a stall is
+introduced before the USE instruction. However, this stall is not
+necessary in every situation. See homework problems 5.17.  Implement
+load forwarding can eliminate unnecessary stalls for LOAD/USE
+hazards. This is helpful for this lab, since the program contains
+instructions that trigger false LOAD/USE hazard alarms:
 
 #+begin_example
         mrmovq 96(%rdi), %r10     # read val from src...
         rmmovq %r10, 96(%rsi)     # ...and store it to dst
 #+end_example
 
-We have to complete homework problems 4.57.
-
-I have found a [[https://dreamanddead.github.io/CSAPP-3e-Solutions/chapter4/4.57/][solution]], but I feel it is difficult to understand.
-
-My own solution is different and I think it is more accurate than the
+I have found a [[https://dreamanddead.github.io/CSAPP-3e-Solutions/chapter4/4.57/][solution]], but I feel it is difficult to understand.  My
+own solution is different and I think it is more accurate than the
 above one.
 
-First, the condition of a LOAD/USE hazard when there is load
-forwarding implemented. The essence of the LOAD/USE hazard with load
-forwarding enabled is:
+The essence of the LOAD/USE hazard with load forwarding implemented
+is:
 
 The value of the destination register of instruction =mrmovq= or =popq= is
-used in the execute stage of the next instruction. Analyzing each
-Y86-64 instruction one by one, one can find out that the following
-instructions might use the value of an register in its execute stage:
+used in the execute stage of the next instruction.
+
+Analyzing each Y86-64 instruction one by one, one can find out that
+the following instructions might use the value of an register in its
+execute stage:
 
 + =opq=: both the source and destination operand
 + =rrmovq=: only the source operand
@@ -137,14 +141,273 @@ instructions might use the value of an register in its execute stage:
 + =ret=: when =mrmovq= or =popq= writes to =%rsp=
 + =iaddq=: only the destination operand
 
-The condition of a LOAD/USE hazard can be obtained from the above
-list.
+Now, to determine which instruction can use the value forwarded from
+the memory stage of its previous instruction, is to determine which
+instruction only use the value of the destination register of its
+previous =mrmovq= or =popq= instruction in its own memory stage.
 
-To forward the value read from memory in a =mrmovq= or =popq= instruction:
+Examining each Y86-64 instruction one by one, one can conclude that
+only the =rmmovq= and =pushq= instructions satisfy the above condition.
+
+*** Changes to the Program
+
+1. Use =iaddq= to reduce the number of instructions
+2. The simulator predicts any branch to be taken, i.e., any
+   conditional jump is successful. Thus, we have to organize the code
+   so that in more cases the predication will come true.
+
+**** The Original Program
 
 #+begin_example
-word e_valA = [
-        E_icode in { IRMMOVQ, IPUSHQ } && E_srcA == M_dstM : m_valM;
-	1 : E_valA;  # Use valA from stage pipe register
-];
+# You can modify this portion
+        # Loop header
+        xorq %rax,%rax          # count = 0;
+        andq %rdx,%rdx          # len <= 0?
+        jle Done                # if so, goto Done:
+
+Loop:   mrmovq (%rdi), %r10     # read val from src...
+        rmmovq %r10, (%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle Npos                # if so, goto Npos:
+        irmovq $1, %r10
+        addq %r10, %rax         # count++
+Npos:   irmovq $1, %r10
+        subq %r10, %rdx         # len--
+        irmovq $8, %r10
+        addq %r10, %rdi         # src++
+        addq %r10, %rsi         # dst++
+        andq %rdx,%rdx          # len > 0?
+        jg Loop                 # if so, goto Loop:
 #+end_example
+
+**** Draft 1: Using iaddq Instruction
+
+#+begin_example
+# You can modify this portion
+        # Loop header
+        xorq %rax,%rax          # count = 0;
+        andq %rdx,%rdx          # len <= 0?
+        jle Done                # if so, goto Done:
+
+Loop:   mrmovq (%rdi), %r10     # read val from src...
+        rmmovq %r10, (%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle Npos                # if so, goto Npos:
+        iaddq $1, %rax          # count++
+Npos:
+        iaddq $-1, %rdx         # len--
+        iaddq $8, %rdi          # src++
+        iaddq $8, %rsi          # dst++
+        andq %rdx,%rdx          # len > 0?
+        jg Loop                 # if so, goto Loop:
+#+end_example
+
+**** Draft 2: Adapting the Jump to Test Pattern
+
+#+begin_example
+# You can modify this portion
+        # Loop header
+        xorq %rax,%rax          # count = 0;
+        jmp Test
+
+Loop:   mrmovq (%rdi), %r10     # read val from src...
+        rmmovq %r10, (%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle Npos                # if so, goto Npos:
+        iaddq $1, %rax          # count++
+Npos:
+        iaddq $-1, %rdx         # len--
+        iaddq $8, %rdi          # src++
+        iaddq $8, %rsi          # dst++
+Test:
+        andq %rdx,%rdx          # len > 0?
+        jg Loop                 # if so, goto Loop:
+#+end_example
+
+**** Conditional Move or Conditional Jump
+
+I have wondered this problem and considered conditional move would be
+the better option, since the number is positive or not is totally
+unpredictable.
+
+Add to =count= using a conditional move takes 4 instructions no matter
+the number is positive or not:
+
+#+begin_example
+        andq %r10, %r10
+        irmovq $0, %rcx
+        cmovg %r9, %rcx # assume %r9 already holds $1
+        addq %rcx, %rax # count++
+#+end_example
+
+Using a conditional jump is more complicated, it takes 2 instructions
+if the predication is true. If the predication is false, then it takes
+3 instructions plus 2 wasted cycles.
+
+#+begin_example
+        andq %r10, %r10         # val <= 0?
+        jle Npos                # if so, goto Npos:
+        iaddq $1, %rax          # count++
+#+end_example
+
+Now, assume the pipe line processor is in a stable state such that
+each instruction only takes one additional cycle to be
+processed. Thus, conditional move takes 4 cycles to update =count=
+properly, while conditional jump takes 2 \times 0.5 + 5 \times 0.5 = 3.5 cycles,
+assuming the numbers are distributed uniformly.
+
+The fact is that conditional jump gives better result in the benchmark
+test, thus we will use conditional jump to update =count=.
+
+**** Draft 3: Loop Unrolling
+
+Now, it takes 10 instructions to process one element in our loop. Loop
+unrolling can help reduce the number of cycles per element (CPE).
+
+#+begin_example
+Loop:
+        mrmovq (%rdi), %r10     # read val from src...
+        rmmovq %r10, (%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P1
+        iaddq $1, %rax         # count++
+
+P1:
+        mrmovq 8(%rdi), %r10     # read val from src...
+        rmmovq %r10, 8(%rsi)     # ...and store it to dst
+        andq %r10, %r10         # val <= 0?
+        jle P2
+        iaddq $1, %rax         # count++
+
+        # ...
+
+P10:
+
+        iaddq $80, %rdi
+        iaddq $80, %rsi
+        iaddq $-10, %rdx
+        jge Loop
+#+end_example
+
+After loop unrolling, CPE decreases because the instructions used to
+update the addresses and loop counters and test loop conditions are
+only executed once for every =k= elements, where =k= is the factor of loop
+unrolling.
+
+The remaining elements can be handled using the original loop, or it
+can also be unrolled:
+
+#+begin_example
+R9:
+        mrmovq 64(%rdi), %r10
+        rmmovq %r10, 64(%rsi)
+        andq %r10, %r10
+        jle R8
+        iaddq $1, %rax
+        
+R8:
+        mrmovq 56(%rdi), %r10
+        rmmovq %r10, 56(%rsi)
+        andq %r10, %r10
+        jle R7
+        iaddq $1, %rax
+
+        # ...
+
+R1:
+        mrmovq (%rdi), %r10
+        rmmovq %r10, (%rsi)
+        andq %r10, %r10
+        jle Done
+        iaddq $1, %rax
+#+end_example
+
+Now, when the main loop finishes, we need to determine the number of
+the remaining elements:
+
+#+begin_example
+RStart:
+        # %rdx now holds the value x - 10, x is the number of remaining elements
+        iaddq $7, %rdx
+        jl L3
+        je R3
+
+        iaddq $-3, %rdx
+        jl L6
+        je R6
+
+        iaddq $-2, %rdx
+        je R8
+        jl R7
+        jmp R9
+
+L3:
+        iaddq $2, %rdx
+        je R1
+        jg R2
+        ret
+
+L6:
+
+        iaddq $1, %rdx
+        jl R4
+        jmp R5
+#+end_example
+
+Note that the conditional jump instructions are organized in a way
+that favors the number of remaining elements is 1, 2, 3 or 4. This is
+because the simulator always predict the branch will be taken and
+there are more test cases with a remaining element number that is 1,
+2, 3 or 4.
+
+**** Draft 4: Comparison Transformed
+
+There is no =cmp= instruction in Y86-64 ISA, the following code is an
+equivalent way to implement =cmp=:
+
+#+begin_example
+        rrmovq %rdx, %rcx
+        iaddq $-42, %rcx
+#+end_example
+
+However, this introduces an additional instruction. In this lab, we
+can use a specific method to implement =cmp= using less
+instructions. For example,
+
+#+begin_example
+        cmp $3, %rdx
+        je R3
+        jl L3
+
+        cmp $6, %rdx
+        jl L6
+        je R6
+#+end_example
+
+can be transformed to
+
+#+begin_example
+        iaddq $-3, %rdx
+        je R3
+        jl L3
+
+        iaddq $-3, %rdx
+        jl L6
+        je R6
+#+end_example
+
+This does not introduce additional instructions by keep tracking the
+value of ~%rdx~ in consecutive comparisons. Though the value of ~%rdx~ is
+changed, the value it compares to changes accordingly.
+
+**** Doubt on Removing ~xorq %rax, %rax~
+
+With the above optimization, the program achieves a 7.52 average CPE,
+which gives 59.6/60.0 final score. I have no idea where to optimize
+further except removing the first instruction of the function, the
+instruction that clears the register ~%rax~. Removing it yields a 7.45
+average CPE which gives 60.0/60.0 final score. However, though this
+version of the program passes all the correctness test, it make the
+function not usable. I doubt this is not the optimization that the
+author of the lab intended. However, I could not find any further
+improvement.
