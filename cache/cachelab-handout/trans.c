@@ -13,19 +13,51 @@
 
 int is_transpose(int M, int N, int A[N][M], int B[M][N]);
 
-void inplace(int* src, int* dst, int n, int N) {
+void diagonal(int* src, int* dst, int n, int N) {
   for (int i = 0; i < n; ++i) {
-    for (int j = 0; j < n; ++j) {
-      *(dst + i * N + j) = *(src + j * N + i);
-    }
+    /* for (int j = 0; j < n; ++j) { */
+    /*   *(dst + i * N + j) = *(src + j * N + i); */
+    /* } */
+    int a0 = *(src + 0 * N + i);
+    int a1 = *(src + 1 * N + i);
+    int a2 = *(src + 2 * N + i);
+    int a3 = *(src + 3 * N + i);
+    int a4 = *(src + 4 * N + i);
+    int a5 = *(src + 5 * N + i);
+    int a6 = *(src + 6 * N + i);
+    int a7 = *(src + 7 * N + i);
+    *(dst + i * N + 0) = a0;
+    *(dst + i * N + 1) = a1;
+    *(dst + i * N + 2) = a2;
+    *(dst + i * N + 3) = a3;
+    *(dst + i * N + 4) = a4;
+    *(dst + i * N + 5) = a5;
+    *(dst + i * N + 6) = a6;
+    *(dst + i * N + 7) = a7;
   }
 }
 
-void swap(int* src, int *dst, int n, int N) {
+void nondiagonal(int* src, int *dst, int n, int N) {
   for (int i = 0; i < n; ++i) {
-    for (int j = 0; j < n; ++j) {
-      *(dst + i * N + j) = *(src + j * N + i);
-    }
+    /* for (int j = 0; j < n; ++j) { */
+    /*   *(dst + i * N + j) = *(src + j * N + i); */
+    /* } */
+    int a0 = *(src + 0 * N + i);
+    int a1 = *(src + 1 * N + i);
+    int a2 = *(src + 2 * N + i);
+    int a3 = *(src + 3 * N + i);
+    int a4 = *(src + 4 * N + i);
+    int a5 = *(src + 5 * N + i);
+    int a6 = *(src + 6 * N + i);
+    int a7 = *(src + 7 * N + i);
+    *(dst + i * N + 0) = a0;
+    *(dst + i * N + 1) = a1;
+    *(dst + i * N + 2) = a2;
+    *(dst + i * N + 3) = a3;
+    *(dst + i * N + 4) = a4;
+    *(dst + i * N + 5) = a5;
+    *(dst + i * N + 6) = a6;
+    *(dst + i * N + 7) = a7;
   }
 }
 
@@ -42,13 +74,13 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N])
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       if (i == j) {
-        inplace((int*)A + i * 8 * 32 + j * 8,
-                (int*)B + i * 8 * 32 + j * 8,
-                8, 32);
+        diagonal((int*)A + i * 8 * 32 + j * 8,
+                 (int*)B + i * 8 * 32 + j * 8,
+                 8, 32);
       } else {
-        swap((int*)A + i * 8 * 32 + j * 8,
-             (int*)B + j * 8 * 32 + i * 8,
-             8, 32);
+        nondiagonal((int*)A + i * 8 * 32 + j * 8,
+                    (int*)B + j * 8 * 32 + i * 8,
+                    8, 32);
       }
     }
   }
