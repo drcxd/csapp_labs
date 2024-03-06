@@ -15,14 +15,14 @@ int is_transpose(int M, int N, int A[N][M], int B[M][N]);
 
 void td8(int* src, int* dst, int N) {
   for (int i = 0; i < 8; ++i) {
-    int a0 = *(src + 0 * N + i);
-    int a1 = *(src + 1 * N + i);
-    int a2 = *(src + 2 * N + i);
-    int a3 = *(src + 3 * N + i);
-    int a4 = *(src + 4 * N + i);
-    int a5 = *(src + 5 * N + i);
-    int a6 = *(src + 6 * N + i);
-    int a7 = *(src + 7 * N + i);
+    int a0 = *(src + i * N + 0);
+    int a1 = *(src + i * N + 1);
+    int a2 = *(src + i * N + 2);
+    int a3 = *(src + i * N + 3);
+    int a4 = *(src + i * N + 4);
+    int a5 = *(src + i * N + 5);
+    int a6 = *(src + i * N + 6);
+    int a7 = *(src + i * N + 7);
     *(dst + i * N + 0) = a0;
     *(dst + i * N + 1) = a1;
     *(dst + i * N + 2) = a2;
@@ -31,6 +31,13 @@ void td8(int* src, int* dst, int N) {
     *(dst + i * N + 5) = a5;
     *(dst + i * N + 6) = a6;
     *(dst + i * N + 7) = a7;
+  }
+  for (int i = 0; i < 8; ++i) {
+    for (int j = 0; j < i; ++j) {
+      int x = *(dst + i * N + j);
+      *(dst + i * N + j) = *(dst + j * N + i);
+      *(dst + j * N + i) = x;
+    }
   }
 }
 
@@ -50,7 +57,7 @@ void td4(int* src, int* dst, int N) {
 void tnd(int* src, int *dst, int N, int n) {
   for (int i = 0; i < n; ++i) {
     for (int j = 0; j < n; ++j) {
-      *(dst + i * N + j) = *(src + j * N + i);
+      *(dst + j * N + i) = *(src + i * N + j);
     }
   }
 }
