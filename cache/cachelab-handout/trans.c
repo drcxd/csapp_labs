@@ -63,8 +63,157 @@ void transsq32(int* A, int* B, int n, int N) {
   }
 }
 
-void transsq64(int* A, int* B) {
+void tnd64(int* src, int* dst) {
+  /* copy 4 * 8 block to dst */
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 8; ++j) {
+      *(dst + i * 64 + j) = *(src + i * 64 + j);
+    }
+  }
+  /* divide the copied 4 * 8 block into two 4 * 4 block and transpose
+     each in place */
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < i; ++j) {
+      int x = *(dst + i * 64 + j);
+      *(dst + i * 64 + j) =  *(dst + j * 64 + i);
+      *(dst + j * 64 + i) = x;
+    }
+  }
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < i; ++j) {
+      int x = *(dst + 4 + i * 64 + j);
+      *(dst + 4 + i * 64 + j) =  *(dst + 4 + j * 64 + i);
+      *(dst + 4 + j * 64 + i) = x;
+    }
+  }
 
+  /* the key part, explained in documentation */
+  for (int i = 0; i < 4; ++i) {
+    int a0 = *(dst + 4 + i * 64 + 0);
+    int a1 = *(dst + 4 + i * 64 + 1);
+    int a2 = *(dst + 4 + i * 64 + 2);
+    int a3 = *(dst + 4 + i * 64 + 3);
+
+    *(dst + 4 + i * 64 + 0) = *(src + 4 * 64 + 0 * 64 + i);
+    *(dst + 4 + i * 64 + 1) = *(src + 4 * 64 + 1 * 64 + i);
+    *(dst + 4 + i * 64 + 2) = *(src + 4 * 64 + 2 * 64 + i);
+    *(dst + 4 + i * 64 + 3) = *(src + 4 * 64 + 3 * 64 + i);
+
+    *(dst + 4 * 64 + i * 64 + 0) = a0;
+    *(dst + 4 * 64 + i * 64 + 1) = a1;
+    *(dst + 4 * 64 + i * 64 + 2) = a2;
+    *(dst + 4 * 64 + i * 64 + 3) = a3;
+  }
+
+  /* copy and transpose the last 4 * 4 block */
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      *(dst + 4 * 64 + 4 + j * 64 + i) = *(src + 4 * 64 + 4 + i * 64 + j);
+    }
+  }
+}
+
+void td64(int* src, int* dst) {
+  /* copy first 4*8 block */
+  for (int i = 0; i < 4; ++i) {
+    int a0 = *(src + i * 64 + 0);
+    int a1 = *(src + i * 64 + 1);
+    int a2 = *(src + i * 64 + 2);
+    int a3 = *(src + i * 64 + 3);
+    int a4 = *(src + i * 64 + 4);
+    int a5 = *(src + i * 64 + 5);
+    int a6 = *(src + i * 64 + 6);
+    int a7 = *(src + i * 64 + 7);
+    *(dst + i * 64 + 0) = a0;
+    *(dst + i * 64 + 1) = a1;
+    *(dst + i * 64 + 2) = a2;
+    *(dst + i * 64 + 3) = a3;
+    *(dst + i * 64 + 4) = a4;
+    *(dst + i * 64 + 5) = a5;
+    *(dst + i * 64 + 6) = a6;
+    *(dst + i * 64 + 7) = a7;
+  }
+  /* transpose each 4*4 block */
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < i; ++j) {
+      int x = *(dst + i * 64 + j);
+      *(dst + i * 64 + j) = *(dst + j * 64 + i);
+      *(dst + j * 64 + i) = x;
+    }
+  }
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < i; ++j) {
+      int x = *(dst + 4 + i * 64 + j);
+      *(dst + 4 + i * 64 + j) = *(dst + 4 + j * 64 + i);
+      *(dst + 4 + j * 64 + i) = x;
+    }
+  }
+
+  /* copy second 4*8 block */
+  for (int i = 0; i < 4; ++i) {
+    int a0 = *(src + 4 * 64 + i * 64 + 0);
+    int a1 = *(src + 4 * 64 + i * 64 + 1);
+    int a2 = *(src + 4 * 64 + i * 64 + 2);
+    int a3 = *(src + 4 * 64 + i * 64 + 3);
+    int a4 = *(src + 4 * 64 + i * 64 + 4);
+    int a5 = *(src + 4 * 64 + i * 64 + 5);
+    int a6 = *(src + 4 * 64 + i * 64 + 6);
+    int a7 = *(src + 4 * 64 + i * 64 + 7);
+    *(dst + 4 * 64 + i * 64 + 0) = a0;
+    *(dst + 4 * 64 + i * 64 + 1) = a1;
+    *(dst + 4 * 64 + i * 64 + 2) = a2;
+    *(dst + 4 * 64 + i * 64 + 3) = a3;
+    *(dst + 4 * 64 + i * 64 + 4) = a4;
+    *(dst + 4 * 64 + i * 64 + 5) = a5;
+    *(dst + 4 * 64 + i * 64 + 6) = a6;
+    *(dst + 4 * 64 + i * 64 + 7) = a7;
+  }
+  /* transpose each 4*4 block */
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < i; ++j) {
+      int x = *(dst + 4*64 + i * 64 + j);
+      *(dst + 4*64 + i * 64 + j) = *(dst + 4*64 + j * 64 + i);
+      *(dst + 4*64 + j * 64 + i) = x;
+    }
+  }
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < i; ++j) {
+      int x = *(dst + 4*64 + 4 + i * 64 + j);
+      *(dst + 4*64 + 4 + i * 64 + j) = *(dst + 4*64 + 4 + j * 64 + i);
+      *(dst + 4*64 + 4 + j * 64 + i) = x;
+    }
+  }
+  /* swap two 4*4 block */
+  for (int i = 0; i < 4; ++i) {
+    int a0 = *(dst + i*64 + 4*64 + 0);
+    int a1 = *(dst + i*64 + 4*64 + 1);
+    int a2 = *(dst + i*64 + 4*64 + 2);
+    int a3 = *(dst + i*64 + 4*64 + 3);
+    int b0 = *(dst + i*64 + 4 + 0);
+    int b1 = *(dst + i*64 + 4 + 1);
+    int b2 = *(dst + i*64 + 4 + 2);
+    int b3 = *(dst + i*64 + 4 + 3);
+    *(dst + i*64 + 4 + 0) = a0;
+    *(dst + i*64 + 4 + 1) = a1;
+    *(dst + i*64 + 4 + 2) = a2;
+    *(dst + i*64 + 4 + 3) = a3;
+    *(dst + i*64 + 4*64 + 0) = b0;
+    *(dst + i*64 + 4*64 + 1) = b1;
+    *(dst + i*64 + 4*64 + 2) = b2;
+    *(dst + i*64 + 4*64 + 3) = b3;
+  }
+}
+
+void transsq64(int* A, int* B) {
+  for (int i = 0; i < 8; ++i) {
+    for (int j = 0; j < 8; ++j) {
+      if (i == j) {
+        td64(A + i * 8 * 64 + j * 8, B + j * 8 * 64 + i * 8);
+      } else {
+        tnd64(A + i * 8 * 64 + j * 8, B + j * 8 * 64 + i * 8);
+      }
+    }
+  }
 }
 
 /*
@@ -78,7 +227,7 @@ char transpose_submit_desc[] = "Transpose submission";
 void transpose_submit(int M, int N, int A[N][M], int B[M][N])
 {
   if (M == 32 && N == 32) {
-    transsq32((int*)A, (int*)B, 8, 32);
+    transsq32((int*)A, (int*)B, 8, N);
   } else if (M == 64 && N == 64) {
     transsq64((int*)A, (int*)B);
   }
