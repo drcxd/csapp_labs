@@ -113,8 +113,27 @@ void tnd64(int* src, int* dst) {
   }
 }
 
-void td64(int* src, int* dst) {
-  /* copy first 4*8 block */
+void td64(int* src, int* dst, int* tmp) {
+  /* copy the lower 4*8 block to tmp */
+  for (int i = 0; i < 4; ++i) {
+    int a0 = *(src + 4 * 64 + i * 64 + 0);
+    int a1 = *(src + 4 * 64 + i * 64 + 1);
+    int a2 = *(src + 4 * 64 + i * 64 + 2);
+    int a3 = *(src + 4 * 64 + i * 64 + 3);
+    int a4 = *(src + 4 * 64 + i * 64 + 4);
+    int a5 = *(src + 4 * 64 + i * 64 + 5);
+    int a6 = *(src + 4 * 64 + i * 64 + 6);
+    int a7 = *(src + 4 * 64 + i * 64 + 7);
+    *(tmp + i * 64 + 0) = a0;
+    *(tmp + i * 64 + 1) = a1;
+    *(tmp + i * 64 + 2) = a2;
+    *(tmp + i * 64 + 3) = a3;
+    *(tmp + i * 64 + 4) = a4;
+    *(tmp + i * 64 + 5) = a5;
+    *(tmp + i * 64 + 6) = a6;
+    *(tmp + i * 64 + 7) = a7;
+  }
+  /* copy upper 4*8 block to dst */
   for (int i = 0; i < 4; ++i) {
     int a0 = *(src + i * 64 + 0);
     int a1 = *(src + i * 64 + 1);
@@ -148,70 +167,55 @@ void td64(int* src, int* dst) {
       *(dst + 4 + j * 64 + i) = x;
     }
   }
-
-  /* copy second 4*8 block */
-  for (int i = 0; i < 4; ++i) {
-    int a0 = *(src + 4 * 64 + i * 64 + 0);
-    int a1 = *(src + 4 * 64 + i * 64 + 1);
-    int a2 = *(src + 4 * 64 + i * 64 + 2);
-    int a3 = *(src + 4 * 64 + i * 64 + 3);
-    int a4 = *(src + 4 * 64 + i * 64 + 4);
-    int a5 = *(src + 4 * 64 + i * 64 + 5);
-    int a6 = *(src + 4 * 64 + i * 64 + 6);
-    int a7 = *(src + 4 * 64 + i * 64 + 7);
-    *(dst + 4 * 64 + i * 64 + 0) = a0;
-    *(dst + 4 * 64 + i * 64 + 1) = a1;
-    *(dst + 4 * 64 + i * 64 + 2) = a2;
-    *(dst + 4 * 64 + i * 64 + 3) = a3;
-    *(dst + 4 * 64 + i * 64 + 4) = a4;
-    *(dst + 4 * 64 + i * 64 + 5) = a5;
-    *(dst + 4 * 64 + i * 64 + 6) = a6;
-    *(dst + 4 * 64 + i * 64 + 7) = a7;
-  }
-  /* transpose each 4*4 block */
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < i; ++j) {
-      int x = *(dst + 4*64 + i * 64 + j);
-      *(dst + 4*64 + i * 64 + j) = *(dst + 4*64 + j * 64 + i);
-      *(dst + 4*64 + j * 64 + i) = x;
+      int x = *(tmp + i * 64 + j);
+      *(tmp + i * 64 + j) = *(tmp + j * 64 + i);
+      *(tmp + j * 64 + i) = x;
     }
   }
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < i; ++j) {
-      int x = *(dst + 4*64 + 4 + i * 64 + j);
-      *(dst + 4*64 + 4 + i * 64 + j) = *(dst + 4*64 + 4 + j * 64 + i);
-      *(dst + 4*64 + 4 + j * 64 + i) = x;
+      int x = *(tmp + 4 + i * 64 + j);
+      *(tmp + 4 + i * 64 + j) = *(tmp + 4 + j * 64 + i);
+      *(tmp + 4 + j * 64 + i) = x;
     }
   }
-  /* swap two 4*4 block */
+  /* swap the second 4*4 block in dst with the first 4*4 block in tmp*/
   for (int i = 0; i < 4; ++i) {
-    int a0 = *(dst + i*64 + 4*64 + 0);
-    int a1 = *(dst + i*64 + 4*64 + 1);
-    int a2 = *(dst + i*64 + 4*64 + 2);
-    int a3 = *(dst + i*64 + 4*64 + 3);
-    int b0 = *(dst + i*64 + 4 + 0);
-    int b1 = *(dst + i*64 + 4 + 1);
-    int b2 = *(dst + i*64 + 4 + 2);
-    int b3 = *(dst + i*64 + 4 + 3);
-    *(dst + i*64 + 4 + 0) = a0;
-    *(dst + i*64 + 4 + 1) = a1;
-    *(dst + i*64 + 4 + 2) = a2;
-    *(dst + i*64 + 4 + 3) = a3;
-    *(dst + i*64 + 4*64 + 0) = b0;
-    *(dst + i*64 + 4*64 + 1) = b1;
-    *(dst + i*64 + 4*64 + 2) = b2;
-    *(dst + i*64 + 4*64 + 3) = b3;
+    for (int j = 0; j < 4; ++j) {
+      int x = *(dst + 4 + i * 64 + j);
+      *(dst + 4 + i * 64 + j) = *(tmp + i * 64 + j);
+      *(tmp + i * 64 + j) = x;
+    }
+  }
+  /* copy tmp to the lower 4*8 bock in dst */
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 8; ++j) {
+      *(dst + 4 * 64 + i * 64 + j) = *(tmp + i * 64 + j);
+    }
   }
 }
 
 void transsq64(int* A, int* B) {
-  for (int i = 0; i < 8; ++i) {
+  for (int i = 0; i < 7; ++i) {
     for (int j = 0; j < 8; ++j) {
       if (i == j) {
-        td64(A + i * 8 * 64 + j * 8, B + j * 8 * 64 + i * 8);
+        td64(A + j * 8 * 64 + i * 8,
+             B + i * 8 * 64 + j * 8,
+             B + i * 8 * 64 + j * 8 + 1 * 8);
       } else {
-        tnd64(A + i * 8 * 64 + j * 8, B + j * 8 * 64 + i * 8);
+        tnd64(A + j * 8 * 64 + i * 8, B + i * 8 * 64 + j * 8);
       }
+    }
+  }
+  for (int i = 7; i >= 0; --i) {
+    if (i == 7) {
+      td64(A + 7 * 8 + i * 64 * 8,
+           B + i * 8 + 7 * 64 * 8,
+           B + i * 8 + 7 * 64 * 8 - 1 * 8);
+    } else {
+      tnd64(A + 7 * 8 + i * 64 * 8, B + i * 8 + 7 * 64 * 8);
     }
   }
 }
