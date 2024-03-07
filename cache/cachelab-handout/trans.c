@@ -13,7 +13,7 @@
 
 int is_transpose(int M, int N, int A[N][M], int B[M][N]);
 
-void td8(int* src, int* dst, int N) {
+void td32(int* src, int* dst, int N) {
   for (int i = 0; i < 8; ++i) {
     int a0 = *(src + i * N + 0);
     int a1 = *(src + i * N + 1);
@@ -41,20 +41,7 @@ void td8(int* src, int* dst, int N) {
   }
 }
 
-void td4(int* src, int* dst, int N) {
-  for (int i = 0; i < 4; ++i) {
-    int a0 = *(src + 0 * N + i);
-    int a1 = *(src + 1 * N + i);
-    int a2 = *(src + 2 * N + i);
-    int a3 = *(src + 3 * N + i);
-    *(dst + i * N + 0) = a0;
-    *(dst + i * N + 1) = a1;
-    *(dst + i * N + 2) = a2;
-    *(dst + i * N + 3) = a3;
-  }
-}
-
-void tnd(int* src, int *dst, int N, int n) {
+void tnd32(int* src, int *dst, int N, int n) {
   for (int i = 0; i < n; ++i) {
     for (int j = 0; j < n; ++j) {
       *(dst + j * N + i) = *(src + i * N + j);
@@ -62,45 +49,22 @@ void tnd(int* src, int *dst, int N, int n) {
   }
 }
 
-void tnd4(int* src, int *dst, int N, int n) {
-  for (int i = 0; i < n; ++i) {
-    /* for (int j = 0; j < n; ++j) { */
-    /*   *(dst + i * N + j) = *(src + j * N + i); */
-    /* } */
-    int a0 = *(src + 0 * N + i);
-    int a1 = *(src + 1 * N + i);
-    int a2 = *(src + 2 * N + i);
-    int a3 = *(src + 3 * N + i);
-    *(dst + i * N + 0) = a0;
-    *(dst + i * N + 1) = a1;
-    *(dst + i * N + 2) = a2;
-    *(dst + i * N + 3) = a3;
-  }
-}
-
-
-void trans_square(int* A, int* B, int N, int n) {
+void transsq32(int* A, int* B, int n, int N) {
   for (int i = 0; i < N / n; ++i) {
     for (int j = 0; j < N / n; ++j) {
       if (i == j) {
-        if (n == 8) {
-          td8(A + i * n * N + j * n,
-              B + i * n * N + j * n, N);
-        } else if (n == 4) {
-          td4(A + i * n * N + j * n,
-              B + i * n * N + j * n, N);
-        }
+        td32(A + i * n * N + j * n,
+             B + i * n * N + j * n, N);
       } else {
-        if (n == 8) {
-          tnd(A + i * n * N + j * n,
+        tnd32(A + i * n * N + j * n,
               B + j * n * N + i * n, N, n);
-        } else if (n == 4) {
-          tnd4(A + i * n * N + j * n,
-               B + j * n * N + i * n, N, n);
-        }
       }
     }
   }
+}
+
+void transsq64(int* A, int* B) {
+
 }
 
 /*
@@ -114,9 +78,9 @@ char transpose_submit_desc[] = "Transpose submission";
 void transpose_submit(int M, int N, int A[N][M], int B[M][N])
 {
   if (M == 32 && N == 32) {
-    trans_square((int*)A, (int*)B, N, 8);
+    transsq32((int*)A, (int*)B, 8, 32);
   } else if (M == 64 && N == 64) {
-    trans_square((int*)A, (int*)B, N, 4);
+    transsq64((int*)A, (int*)B);
   }
 }
 
