@@ -1,3 +1,21 @@
 * Cache Simulator
 
 All in the code.
+
+* Matrix Transpose
+
+The cache has 2^5 sets and each set has 1 2^5-byte cache line, so the
+cache can hold 32 \times 8 consecutive =int= objects.
+
+** 32 \times 32
+
+Partition the matrix into 8 \times 8 sub-matrices and working on them.
+
+Unroll the loop on diagonal, since there are conflicts.
+
+** 64 \times 64
+
+partition the 64 \times 64 matrix into 4 32 \times 32 matrices.
+
++ https://zhuanlan.zhihu.com/p/79058089
++ https://zhuanlan.zhihu.com/p/387662272
