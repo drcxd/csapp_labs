@@ -234,6 +234,21 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N])
     transsq32((int*)A, (int*)B, 8, N);
   } else if (M == 64 && N == 64) {
     transsq64((int*)A, (int*)B);
+  } else {
+    int bw = 8;
+    int bh = 24;
+    int i, j, m, n;
+    for (i = 0; i < N; i += bh) {
+      for (j = 0; j < M; j += bw) {
+        for (m = i; m < i + bh; ++m) {
+          for (n = j; n < j + bw; ++n) {
+            if (m < N && n < M) {
+              B[n][m] = A[m][n];
+            }
+          }
+        }
+      }
+    }
   }
 }
 
