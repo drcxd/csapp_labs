@@ -1,17 +1,34 @@
 * Cache Simulator
 
-All in the code.
+Quite straight forward, just implement the specification.
 
-* Matrix Transpose
+* Matrix Transposing
 
-The cache has 2^5 sets and each set has 1 2^5-byte cache line, so the
-cache can hold 32 \times 8 consecutive =int= objects.
+The main technique used to optimize matrix transposing is
+blocking. That is, to partition the to be transposed matrix in to
+smaller blocks which fit inside the cache, then, transposing each
+block to reduce the number of cache misses which finally reduce the
+time spent on loading new cache lines from lower level of storage to
+cache and eventually CPU.
+
+This means the properties of the cache and the dimensions of the
+matrix to be transposed are crucial to design the optimized
+transposing algorithm. Actually, the first thing you need to do to
+start designing the algorithm is to examine the dimensions of the
+matrix and the properties of the cache and see how the cache fit in
+the matrix. This also implies that such algorithm may not work on any
+matrix and any cache, so such optimization may be designed
+specifically for different matrices and caches.
+
+The cache used in this lab is a direct-mapped cache with 32 sets, and
+each set has a 32 bytes line.
 
 ** 32 \times 32
 
-Partition the matrix into 8 \times 8 sub-matrices and working on them.
-
-Unroll the loop on diagonal, since there are conflicts.
+In this case, since the cache can hold 32 \times 8 =int= objects, it can
+cover the first 8 rows of the matrix. Naturally, we can try using a 8
+\times 8 block on the matrix. The cache can hold at most 4 such block at
+the same time.
 
 ** 64 \times 64
 
