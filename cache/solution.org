@@ -27,12 +27,193 @@ each set has a 32 bytes line.
 
 In this case, since the cache can hold 32 \times 8 =int= objects, it can
 cover the first 8 rows of the matrix. Naturally, we can try using a 8
-\times 8 block on the matrix. The cache can hold at most 4 such block at
+\times 8 (=int= objects) blocking. The cache can hold at most 4 such block at
 the same time.
+
+If we only concern about the number of cache misses, then we can copy
+each row of the block from source to destination. After that, the
+cache should hold a block of the destination matrix, then we can do
+the transposing on the destination matrix in place, which generates no
+additional cache misses. This can reduce the conflict misses when the
+source block and the destination block are mapped to the same block in
+the cache.
 
 ** 64 \times 64
 
-partition the 64 \times 64 matrix into 4 32 \times 32 matrices.
+Things have become more complicated when the dimensions of the matrix
+grows to 64. First, the cache can cover up to 4 rows of the
+matrix. This means that a 8 \times 8 block will introduce conflict misses
+between the upper 4 rows and the lower 4 rows of the block. Actually,
+a naive 8 \times 8 blocking transposing algorithm yields almost the same
+number of misses as a simple row-wise transposing algorithm.
+
+Consequently, we want to try a 4 \times 4 blocking. However, since the line
+size is 32 bytes, which is equivalent to 8 =int= objects, the cache
+actually loads 4 \times 8 blocks into it, and it can hold at most 8 such
+blocks at the same time. 4 \times 4 blocking does not yield the optimal
+result, since the algorithm only working on half of the 4 \times 8 block
+that is loaded into the cache.
+
+Now we can see that the 8 \times 8 blocking on a 32 \times 32 matrix actually
+have two advantages:
+
+1. The blocking utilizes all the data read into the cache lines,
+   comparing with the 4 \times 4 blocking.
+2. There are no conflicts between data in the blocks, comparing with
+   the 8 \times 8 blocking on the 64 \times 64 matrix.
+
+
+These two advantages should be the guideline principles for designing
+blocking algorithms.
+
+In the following sections, we will optimize the 4 \times 4 blocking
+algorithm, transforming it into a blocking algorithm that yields the
+optimal cache misses.
+
+In the following discussion, I'll use \(A\) to denote a 8 \times 8
+block in the source matrix and \(B\) to denote a 8 \times 8 block in
+corresponding destination matrix, i.e. the target block of the
+transposing. I'll use \(X_{11}\) for the top-left 4 \times 4
+sub-matrix, \(X_{12}\) for the top-right 4 \times 4 sub-matrix,
+\(X_{21}\) for the bottom-left 4 \times 4 sub-matrix and \(X_{22}\)
+for the bottom-right 4 \times 4 sub-matrix of the 8 \times 8 matrix
+\(X\).
+
+*** Part I: From 4 \times 4 to 4 \times 8 to  8 \times 8
+
+According to the first principle, we have to utilize the extra 4 =int=
+objects that gets loaded into the cache when we are dealing with the 4
+\times 4 block. As a result, we have to operate on a 4 \times 8 block
+a time, rather than a 4 \times 4 block. However, the extra 4 \times 4
+block must be stored somewhere, according to the request of the lab,
+only the destination matrix can be used. After it is stored in the
+destination matrix, we must utilize it to take advantage the fact that
+it is already in cache. Since it is not in the correct position, we
+must swap it with the 4 \times 4 sub-matrix that should be in its
+place. This requires copying another 4 \times 8 block from the source
+to the destination and swap one of the 4 \times 4 block with the
+previous out-of-place 4 \times 4 block. However, the second 4 \times 8
+block are mapped to the same position in the cache as the first 4
+\times 8 block. Thus, there may be conflicts between them. Can we
+swapping the two 4 \times 4 blocks without introducing unnecessary
+cache misses? In this case, it turns out we can. I'll explain the
+detail with a concrete example to help understanding.
+
+Let's assume that \(A\) and \(B\) are not matched to the same location
+in the cache. In this case, they are not in the same columns. We first
+copy \(A_{11}\) and \(A_{12}\) to \(B_{11}\) and \(B_{12}\). This
+process yields 8 cache misses, each for the read/write operation of a
+cache line. Since \(A\) and \(B\) do not compete for the same cache
+lines, then now both 4 \times 8 blocks are in cache, and we can
+transpose the two 4 \times 4 block in the destination matrix in place
+without cache misses.
+
+Then, we read the first column of \(A_{21}\), which evicting the
+cached 4 \times 8 block of \(A\) and causing 4 cache misses. Note that
+the 4 \times 8 block of \(B\) is not affected. Then we read the first
+row of \(B_{12}\) and replace them with the first column of
+\(A_{21}\). This process yields no additional cache misses and placed
+the first column of \(A_{21}\) into the correct place. Now we place
+the four elements coming from the first row of \(B_{12}\) to the first
+row of \(B_{21}\). Since we have already transposed the elements in
+\(B_{12}\) in place, this process also place the four elements in the
+correct place. However, this generates a cache miss and evicting the
+first row of \(B_{1*}\) from the cache, because the first row of
+\(B_{2*}\) competes the same cache line. Fortunately, we have done
+with the first row of \(B_{1*}\): we do not need to access it any
+more, so evicting it from the cache is totally acceptable and does not
+cause extra cache misses.
+
+The same process is done for the second, third and last column of
+\(A_{21}\), and the second, third and last row of \(B_{12}\) and
+\(B_{21}\). This generates 3 additional cache misses for each row of
+\(B_{21}\). After this, \(B_{11}\), \(B_{12}\), and \(B_{21}\) all
+hold the correct elements and the cache holds \(A_{2*}\) and
+\(B_{2*}\). Thus, we can freely transpose \(A_{22}\) to \(B_{22}\)
+without any additional cache misses.
+
+The whole process of transposing \(A\) to \(B\) generates 16 cache
+misses, each for the read/write operation of a cache line, which is
+the optimal cache misses we can achieve.
+
+*** Part II: Use Adjacent Blocks to Transpose Diagonal Blocks
+
+In the previous section we hold an assumption that \(A\) and \(B\) do
+not compete for the same position in the cache. This is true for all 8
+\times 8 blocks but the diagonal blocks. Thus, using the blocking algorithm
+in the previous section on diagonal blocks will generate much more
+cache misses.
+
+We can do some specific optimization for the diagonal blocks. The
+simplest one is to copy and transpose \(A_{1*}\) and \(A_{2*}\) to \(B_{1*}\)
+and \(B_{2*}\) respectively. This process generates 16 cache misses, each
+for a read/write operation of a cache line. Then, we read the first
+row of \(B_{21}\) and swap it with the first row of \(B_{12}\). This process
+causes two cache misses, one for read/write the first row of \(B_{12}\),
+the other one for write to the first row of \(B_{21}\). This is because
+the first row of \(B_{12}\) and \(B_{21}\) are mapped to the same cache
+line. After all four rows of \(B_{21}\) are swapped with the four rows
+\(B_{12}\), we have correctly transposed the 8 \times 8 blocks costing a total
+of 24 cache misses.
+
+Can we optimize further more? It turns out we can. The problem of the
+previous the optimization is that the upper four rows of a 4 \times 8 block
+compete for the same cache lines with the lower four rows of the
+block. At any time, we are only utilizing a single 4 \times 8 block of the
+cache, though the cache can actually hold 8 such blocks at the same
+time. This leads to the third principle of designing blocking
+algorithm:
+
+At the same time, utilize the space of cache as much as possible.
+
+In this case, how can we utilize the other space of the cache when
+transposing a diagonal 8 \times 8 block? A natural idea is to use
+additional space that does not compete with \(A\) and \(B\). Let's
+call this extra block \(C\).
+
+Now, if we first copy \(A_{1*}\) to \(C_{1*}_{}\), then copy \(A_2*\) to
+\(B_{2*}\), we have both \(B_{2*}\) and \(C_{1*}\) in cache. This process costs
+16 cache misses, each for a read/write operation of a cache line. At
+this point of time, we can freely transposing and swapping \(C_{1*}\) and
+\(B_{2*}\) without causing further cache misses. Finally, we copy \(C_{1*}\)
+to \(B_{1*}\). This finishes the transposing and generates 4 cache
+misses. The whole transposing process generates 20 cache misses, which
+is still not the optimal. However, if \(C_{1*}\) will be accessed in the
+operations on the next block, then we save 4 cache misses for the next
+block and achieve global optimal cache misses.
+
+In fact, when using blocking algorithm to transpose a matrix, the
+order of blocks get transposed does not affect the final result. For
+convenience, we usually traversing blocks row-wise in the source
+matrix from left to right, from top to bottom. In this way, the next
+block to be accessed in the destination matrix after transposing a
+diagonal block is the block below the diagonal block. However, this
+block can not be used as the \(C\) block in the above algorithm, since
+it also competes with the diagonal blocks for the same cache
+lines. Thus, we have to traverse the source matrix column-wise, from
+top to bottom, from left to right. This way, the next block we access
+in the destination matrix after transposing the diagonal block will be
+the block on the right of the diagonal block. This block does not
+compete with the diagonal blocks, so it is suitable for the purpose of
+\(C\) block. Finally, the last column of the source matrix must be
+traversed from bottom to top, which is different from the other
+columns, since the diagonal block is the last block if the column is
+traversed from top to bottom. This will not reuse the 4 additional
+cache misses generated when transposing a diagonal matrix.
 
 + https://zhuanlan.zhihu.com/p/79058089
 + https://zhuanlan.zhihu.com/p/387662272
++ https://blog.csdn.net/xbb224007/article/details/81103995
+
+** 61 \times 67
+
+For this irregular matrix, the dimensions of the matrix is no longer a
+multiple of the cache line. Thus, it is difficult to achieve the
+second principle of designing a blocking algorithm. However, blocking
+can still reduce the number of cache misses to some extend. We can use
+a \(x \times y\) block, experimenting with different number of \(x\) and
+\(y\) and see which combination yields the least cache misses. This
+trail-and-error process might be part of optimization in the real
+world. However, such optimization only works for specific set of
+hardware, so it must be combined with some techniques to determine the
+specifications of the hardware the program is working on.
