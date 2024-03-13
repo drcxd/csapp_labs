@@ -298,10 +298,15 @@ void do_bgfg(char **argv)
 void waitfg(pid_t pid)
 {
     int status;
-    waitpid(pid, &status, 0);
+    waitpid(pid, &status, WUNTRACED);
     if (WIFEXITED(status) || WIFSIGNALED(status))
     {
         deletejob(jobs, pid);
+    }
+    else if (WIFSTOPPED(status))
+    {
+        struct job_t *job = getjobpid(jobs, pid);
+        job->state = ST;
     }
     return;
 }
@@ -348,7 +353,7 @@ void sigint_handler(int sig)
     {
         struct job_t *job = getjobpid(jobs, fg);
         printf("Job [%d] (%d) terminated by signal %d\n", job->jid, job->pid, sig);
-        kill(-fg, SIGINT);
+        kill(-fg, sig);
     }
     return;
 }
@@ -360,6 +365,13 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig)
 {
+    pid_t fg = fgpid(jobs);
+    if (fg != 0)
+    {
+        struct job_t *job = getjobpid(jobs, fg);
+        printf("Job [%d] (%d) stopped by signal %d\n", job->jid, job->pid, sig);
+        kill(-fg, sig);
+    }
     return;
 }
 
