@@ -276,6 +276,11 @@ int builtin_cmd(char **argv)
     {
         exit(0);
     }
+    else if (!strcmp(cmd, "jobs"))
+    {
+        listjobs(jobs);
+        return 1;
+    }
     return 0;     /* not a builtin command */
 }
 
@@ -338,6 +343,13 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig)
 {
+    pid_t fg = fgpid(jobs);
+    if (fg != 0)
+    {
+        struct job_t *job = getjobpid(jobs, fg);
+        printf("Job [%d] (%d) terminated by signal %d\n", job->jid, job->pid, sig);
+        kill(-fg, SIGINT);
+    }
     return;
 }
 
