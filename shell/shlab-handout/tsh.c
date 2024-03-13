@@ -168,6 +168,10 @@ void eval(char *cmdline)
 {
     char *argv[MAXARGS];
     int bg = parseline(cmdline, argv);
+    if (argv[0] == NULL)
+    {
+        return;
+    }
     if (builtin_cmd(argv))
     {
         return;
@@ -191,6 +195,11 @@ void eval(char *cmdline)
     }
     addjob(jobs, pid, bg ? BG : FG, cmdline);
     sigprocmask(SIG_SETMASK, &old, &new);
+    if (bg)
+    {
+        printf("[%d] (%d) %s", nextjid - 1, pid, cmdline);
+    }
+
     if (!bg)
     {
         waitfg(pid);
@@ -263,7 +272,7 @@ int parseline(const char *cmdline, char **argv)
 int builtin_cmd(char **argv)
 {
     char* cmd = argv[0];
-    if (!strncmp(cmd, "quit", strlen(cmd)))
+    if (!strcmp(cmd, "quit"))
     {
         exit(0);
     }
@@ -305,6 +314,20 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig)
 {
+    int olderrno = errno;
+    int status;
+    pid_t pid;
+    pid_t fg = fgpid(jobs);
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
+    {
+        if (fg == pid)
+        {
+            /* ignore FG job, it will be handled by waitfg */
+            continue;
+        }
+        deletejob(jobs, pid);
+    }
+    errno = olderrno;
     return;
 }
 
