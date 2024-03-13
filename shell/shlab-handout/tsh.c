@@ -281,6 +281,41 @@ int builtin_cmd(char **argv)
         listjobs(jobs);
         return 1;
     }
+    else if (!strcmp(cmd, "bg") || ! strcmp(cmd, "fg"))
+    {
+        char bf = !strcmp(cmd, "bg");
+        char use_pid = argv[1][0] != '%';
+        pid_t pid;
+        int jid;
+        if (use_pid)
+        {
+            sscanf(argv[1], "%d", &pid);
+        }
+        else
+        {
+            sscanf(argv[1], "%%%d", &jid);
+        }
+        struct job_t *job = NULL;
+        if (use_pid)
+        {
+            job = getjobpid(jobs, pid);
+        }
+        else
+        {
+            job = getjobjid(jobs, jid);
+        }
+        job->state = bf ? BG : FG;
+        kill(-job->pid, SIGCONT);
+        if (bf)
+        {
+            printf("[%d] (%d) %s", job->jid, job->pid, job->cmdline);
+        }
+        else
+        {
+            waitfg(job->pid);
+        }
+        return 1;
+    }
     return 0;     /* not a builtin command */
 }
 
