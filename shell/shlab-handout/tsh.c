@@ -284,25 +284,46 @@ int builtin_cmd(char **argv)
     else if (!strcmp(cmd, "bg") || ! strcmp(cmd, "fg"))
     {
         char bf = !strcmp(cmd, "bg");
+        if (argv[1] == NULL)
+        {
+            printf("%s command requires PID or %%jobid argument\n", argv[0]);
+            return 1;
+        }
         char use_pid = argv[1][0] != '%';
         pid_t pid;
         int jid;
+        int r = 0;
         if (use_pid)
         {
-            sscanf(argv[1], "%d", &pid);
+            r = sscanf(argv[1], "%d", &pid);
         }
         else
         {
-            sscanf(argv[1], "%%%d", &jid);
+            r = sscanf(argv[1], "%%%d", &jid);
+        }
+        if (r != 1)
+        {
+            printf("%s: argument must be a PID or %%jobid\n", argv[0]);
+            return 1;
         }
         struct job_t *job = NULL;
         if (use_pid)
         {
             job = getjobpid(jobs, pid);
+            if (job == NULL)
+            {
+                printf("(%d): No such process\n", pid);
+                return 1;
+            }
         }
         else
         {
             job = getjobjid(jobs, jid);
+            if (job == NULL)
+            {
+                printf("%%%d: No such job\n", jid);
+                return 1;
+            }
         }
         job->state = bf ? BG : FG;
         kill(-job->pid, SIGCONT);
@@ -363,8 +384,18 @@ void sigchld_handler(int sig)
     int status;
     pid_t pid;
     pid_t fg = fgpid(jobs);
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
+    while ((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0)
     {
+        /* struct job_t *job = getjobpid(jobs, pid); */
+        /* if (WIFSIGNALED(status)) */
+        /* { */
+        /*     printf("Job [%d] (%d) terminated by signal %d", job->jid, job->pid, WTERMSIG(status)); */
+        /* } */
+        /* if (WIFSTOPPED(status)) */
+        /* { */
+        /*     printf("Job [%d] (%d) stopped by signal %d", job->jid, job->pid, WSTOPSIG(status)); */
+        /* } */
+
         if (fg == pid)
         {
             /* ignore FG job, it will be handled by waitfg */
