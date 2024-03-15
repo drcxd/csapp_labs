@@ -228,7 +228,6 @@ static void *coalesce(void *bp)
         return bp;
     }
 
-    unlink_blk(bp);
     if (prev_alloc && !next_alloc) {      /* Case 2 */
       unlink_blk(NEXT_BLKP(bp));
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
@@ -237,7 +236,7 @@ static void *coalesce(void *bp)
     }
 
     else if (!prev_alloc && next_alloc) {      /* Case 3 */
-      unlink_blk(PREV_BLKP(bp));
+      unlink_blk(bp);
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
@@ -246,14 +245,13 @@ static void *coalesce(void *bp)
 
     else {                                     /* Case 4 */
       unlink_blk(NEXT_BLKP(bp));
-      unlink_blk(PREV_BLKP(bp));
+      unlink_blk(bp);
         size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
             GET_SIZE(FTRP(NEXT_BLKP(bp)));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
-    insert_front(bp);
     /* $end mmfree */
 #ifdef NEXT_FIT
     /* Make sure the rover isn't pointing into the free block */
@@ -415,7 +413,7 @@ void unlink_blk(void *bp) {
   if (bp == first_free) {
     first_free = (char *)next_blk;
   }
-  check_free_list();
+  /* check_free_list(); */
 }
 
 void insert_front(void *bp) {
