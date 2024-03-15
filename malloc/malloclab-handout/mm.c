@@ -91,6 +91,7 @@ static void *find_fit(size_t asize);
 static void *coalesce(void *bp);
 static void unlink_blk(void *bp);
 static void insert_front(void *bp);
+static size_t round_size(size_t size);
 static void printblock(void *bp);
 static void checkheap(int verbose);
 static void checkblock(void *bp);
@@ -142,11 +143,7 @@ void *mm_malloc(size_t size)
         return NULL;
 
     /* Adjust block size to include overhead and alignment reqs. */
-    if (size <= DSIZE)                                          //line:vm:mm:sizeadjust1
-        asize = 3*DSIZE;                                        //line:vm:mm:sizeadjust2
-    else
-        asize = DSIZE * ((size + (2*DSIZE) + (DSIZE-1)) / DSIZE); //line:vm:mm:sizeadjust3
-
+    asize = round_size(size);
     /* Search the free list for a fit */
     if ((bp = find_fit(asize)) != NULL) {  //line:vm:mm:findfitcall
         place(bp, asize);                  //line:vm:mm:findfitplace
@@ -201,6 +198,35 @@ void *mm_realloc(void *ptr, size_t size)
         return mm_malloc(size);
     }
 
+    oldsize = GET_SIZE(HDRP(ptr));
+
+    /* If next block is free and size is large enough to hold
+       realloced block, then extend this block and skip the malloc and
+       free */
+    {
+      size_t asize = round_size(size);
+      char* next_bp = NEXT_BLKP(ptr);
+      char next_alloc = GET_ALLOC(HDRP(next_bp));
+      size_t next_size = GET_SIZE(HDRP(next_bp));
+      size_t total_size = next_size + oldsize;
+      if (!next_alloc && (total_size >= asize)) {
+        unlink_blk(next_bp);
+        size_t remain_size = total_size - asize;
+        if (remain_size >= 2*DSIZE) {
+          PUT(HDRP(ptr), PACK(asize, 1));
+          PUT(FTRP(ptr), PACK(asize, 1));
+          char* new_next_bp = NEXT_BLKP(ptr);
+          PUT(HDRP(new_next_bp), PACK(remain_size, 0));
+          PUT(FTRP(new_next_bp), PACK(remain_size, 0));
+          insert_front(new_next_bp);
+        } else {
+          PUT(HDRP(ptr), PACK(total_size, 1));
+          PUT(FTRP(ptr), PACK(total_size, 1));
+        }
+        return ptr;
+      }
+    }
+
     newptr = mm_malloc(size);
 
     /* If realloc() fails the original block is left untouched  */
@@ -209,7 +235,7 @@ void *mm_realloc(void *ptr, size_t size)
     }
 
     /* Copy the old data. */
-    oldsize = GET_SIZE(HDRP(ptr));
+    /* oldsize = GET_SIZE(HDRP(ptr)); */
     if(size < oldsize) oldsize = size;
     memcpy(newptr, ptr, oldsize);
 
@@ -344,7 +370,7 @@ static void *find_fit(size_t asize)
     while (it != NULL) {
       unsigned int size = GET_SIZE(HDRP(it));
       if (asize <= size) {
-        unsigned diff = abs(size - asize);
+        unsigned diff = size - asize;
         if (diff < best_diff) {
           best_diff = diff;
           best_fit = it;
@@ -442,3 +468,11 @@ void insert_front(void *bp) {
 /*     it = *GETNP(it); */
 /*   } */
 /* } */
+
+size_t round_size(size_t size) {
+  if (size <= DSIZE) {
+    return 3 * DSIZE; // line:vm:mm:sizeadjust2
+  } // line:vm:mm:sizeadjust1
+  return DSIZE *
+         ((size + (2 * DSIZE) + (DSIZE - 1)) / DSIZE); // line:vm:mm:sizeadjust3
+}
