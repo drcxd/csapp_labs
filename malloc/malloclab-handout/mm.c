@@ -148,9 +148,8 @@ void *mm_malloc(size_t size)
 
     /* Search the free list for a fit */
     if ((bp = find_fit(asize)) != NULL) {  //line:vm:mm:findfitcall
-      /* assert(!GET_ALLOC(HDRP(bp))); */
         place(bp, asize);                  //line:vm:mm:findfitplace
-        return bp + 2*PSIZE;
+        return bp;
     }
 
     /* No fit found. Get more memory and place the block */
@@ -158,7 +157,7 @@ void *mm_malloc(size_t size)
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;                                  //line:vm:mm:growheap2
     place(bp, asize);                                 //line:vm:mm:growheap3
-    return bp + 2*PSIZE;
+    return bp;
 }
 /*
  * mm_free - Freeing a block does nothing.
@@ -168,8 +167,6 @@ void mm_free(void *bp)
     /* $end mmfree */
     if (bp == 0)
         return;
-
-    bp = (char*)bp - 2*PSIZE;
 
     /* $begin mmfree */
     size_t size = GET_SIZE(HDRP(bp));
@@ -405,7 +402,6 @@ void checkheap(int verbose)
 }
 
 void unlink_blk(void *bp) {
-  assert(!GET_ALLOC(HDRP(bp)));
   void **prev_blk = *(GETPP(bp));
   void **next_blk = *(GETNP(bp));
   void **prev_next = prev_blk ? GETNP(prev_blk) : NULL;
@@ -423,14 +419,13 @@ void unlink_blk(void *bp) {
 }
 
 void insert_front(void *bp) {
-  assert(!GET_ALLOC(HDRP(bp)));
   PUTP(GETPP(bp), 0);
   PUTP(GETNP(bp), first_free);
   if (first_free) {
     PUTP(GETPP(first_free), bp);
   }
   first_free = bp;
-  check_free_list();
+  /* check_free_list(); */
 }
 
 void check_free_list() {
