@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "mm.h"
 #include "memlib.h"
@@ -93,7 +94,7 @@ static void insert_front(void *bp);
 static void printblock(void *bp);
 static void checkheap(int verbose);
 static void checkblock(void *bp);
-static void check_free_list();
+/* static void check_free_list(); */
 
 /*
  * mm_init - initialize the malloc package.
@@ -338,13 +339,20 @@ static void *find_fit(size_t asize)
     /* return NULL; /\* No fit *\/ */
 
     void **it = (void**)first_free;
+    void **best_fit = NULL;
+    unsigned best_diff = UINT32_MAX;
     while (it != NULL) {
-      if (asize <= GET_SIZE(HDRP(it))) {
-        return it;
+      unsigned int size = GET_SIZE(HDRP(it));
+      if (asize <= size) {
+        unsigned diff = abs(size - asize);
+        if (diff < best_diff) {
+          best_diff = diff;
+          best_fit = it;
+        }
       }
       it = *(GETNP(it));
     }
-    return NULL;
+    return best_fit;
 #endif
 }
 
@@ -426,11 +434,11 @@ void insert_front(void *bp) {
   /* check_free_list(); */
 }
 
-void check_free_list() {
-  void** it = (void**)first_free;
-  while (it) {
-    assert(!GET_ALLOC(HDRP(it)));
-    assert(it != *GETNP(it));
-    it = *GETNP(it);
-  }
-}
+/* void check_free_list() { */
+/*   void** it = (void**)first_free; */
+/*   while (it) { */
+/*     assert(!GET_ALLOC(HDRP(it))); */
+/*     assert(it != *GETNP(it)); */
+/*     it = *GETNP(it); */
+/*   } */
+/* } */
