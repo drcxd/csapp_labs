@@ -459,10 +459,10 @@ void insert_front(void *bp) {
 
 size_t round_size(size_t size) {
   if (size <= DSIZE) {
-    return 3 * DSIZE; // line:vm:mm:sizeadjust2
+    return 2 * DSIZE; // line:vm:mm:sizeadjust2
   } // line:vm:mm:sizeadjust1
   return DSIZE *
-         ((size + (2 * DSIZE) + (DSIZE - 1)) / DSIZE); // line:vm:mm:sizeadjust3
+         ((size + (1 * DSIZE) + (DSIZE - 1)) / DSIZE); // line:vm:mm:sizeadjust3
 }
 
 void *try_merge_realloc(void *bp, size_t size) {
