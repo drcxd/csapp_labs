@@ -59,6 +59,10 @@ team_t team = {
 #define GET(p)       (*(unsigned int *)(p))            //line:vm:mm:get
 #define PUT(p, val) (*(unsigned int *)(p) = (val))     // line:vm:mm:put
 #define PUTP(p, val) (*(void**)(p) = (void**)(val))
+/* get pointer to pointer to predecessor */
+#define GETPP(p) ((void **)(p))
+/* get pointer to pointer to successor */
+#define GETNP(p) ((void**)(p) + 1)
 
 /* Read the size and allocated fields from address p */
 #define GET_SIZE(p)  (GET(p) & ~0x7)                   //line:vm:mm:getsize
@@ -89,6 +93,7 @@ static void insert_front(void *bp);
 static void printblock(void *bp);
 static void checkheap(int verbose);
 static void checkblock(void *bp);
+static void check_free_list();
 
 /*
  * mm_init - initialize the malloc package.
@@ -226,35 +231,32 @@ static void *coalesce(void *bp)
         return bp;
     }
 
+    unlink_blk(bp);
     if (prev_alloc && !next_alloc) {      /* Case 2 */
-      unlink_blk(bp);
       unlink_blk(NEXT_BLKP(bp));
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size,0));
-      insert_front(bp);
     }
 
     else if (!prev_alloc && next_alloc) {      /* Case 3 */
-      unlink_blk(bp);
       unlink_blk(PREV_BLKP(bp));
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
-        insert_front(bp);
     }
 
     else {                                     /* Case 4 */
-      unlink_blk(bp);
       unlink_blk(NEXT_BLKP(bp));
+      unlink_blk(PREV_BLKP(bp));
         size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
             GET_SIZE(FTRP(NEXT_BLKP(bp)));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
-        insert_front(bp);
     }
+    insert_front(bp);
     /* $end mmfree */
 #ifdef NEXT_FIT
     /* Make sure the rover isn't pointing into the free block */
@@ -345,7 +347,7 @@ static void *find_fit(size_t asize)
       if (asize <= GET_SIZE(HDRP(it))) {
         return it;
       }
-      it = *(it + 1);
+      it = *(GETNP(it));
     }
     return NULL;
 #endif
@@ -403,11 +405,11 @@ void checkheap(int verbose)
 }
 
 void unlink_blk(void *bp) {
-  /* assert(!GET_ALLOC(HDRP(bp))); */
-  void **prev_blk = *(void **)bp;
-  void **next_blk = *((void **)bp + 1);
-  void **prev_next = prev_blk ? prev_blk + 1 : NULL;
-  void **next_prev = next_blk ? next_blk : NULL;
+  assert(!GET_ALLOC(HDRP(bp)));
+  void **prev_blk = *(GETPP(bp));
+  void **next_blk = *(GETNP(bp));
+  void **prev_next = prev_blk ? GETNP(prev_blk) : NULL;
+  void **next_prev = next_blk ? GETPP(next_blk) : NULL;
   if (prev_next) {
     *prev_next = next_blk;
   }
@@ -417,15 +419,25 @@ void unlink_blk(void *bp) {
   if (bp == first_free) {
     first_free = (char *)next_blk;
   }
+  check_free_list();
 }
 
 void insert_front(void *bp) {
-  /* assert(!GET_ALLOC(HDRP(bp))); */
-  PUTP(bp, 0);
-  PUTP((char *)bp + PSIZE, first_free);
-  /* TODO: prev of first_free should be point to bp */
+  assert(!GET_ALLOC(HDRP(bp)));
+  PUTP(GETPP(bp), 0);
+  PUTP(GETNP(bp), first_free);
   if (first_free) {
-    PUTP(first_free, bp);
+    PUTP(GETPP(first_free), bp);
   }
   first_free = bp;
+  check_free_list();
+}
+
+void check_free_list() {
+  void** it = (void**)first_free;
+  while (it) {
+    assert(!GET_ALLOC(HDRP(it)));
+    assert(it != *GETNP(it));
+    it = *GETNP(it);
+  }
 }
