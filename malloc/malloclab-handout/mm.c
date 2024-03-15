@@ -92,6 +92,7 @@ static void *coalesce(void *bp);
 static void unlink_blk(void *bp);
 static void insert_front(void *bp);
 static size_t round_size(size_t size);
+static void *try_merge_realloc(void *bp, size_t size);
 static void printblock(void *bp);
 static void checkheap(int verbose);
 static void checkblock(void *bp);
@@ -200,31 +201,8 @@ void *mm_realloc(void *ptr, size_t size)
 
     oldsize = GET_SIZE(HDRP(ptr));
 
-    /* If next block is free and size is large enough to hold
-       realloced block, then extend this block and skip the malloc and
-       free */
-    {
-      size_t asize = round_size(size);
-      char* next_bp = NEXT_BLKP(ptr);
-      char next_alloc = GET_ALLOC(HDRP(next_bp));
-      size_t next_size = GET_SIZE(HDRP(next_bp));
-      size_t total_size = next_size + oldsize;
-      if (!next_alloc && (total_size >= asize)) {
-        unlink_blk(next_bp);
-        size_t remain_size = total_size - asize;
-        if (remain_size >= 2*DSIZE) {
-          PUT(HDRP(ptr), PACK(asize, 1));
-          PUT(FTRP(ptr), PACK(asize, 1));
-          char* new_next_bp = NEXT_BLKP(ptr);
-          PUT(HDRP(new_next_bp), PACK(remain_size, 0));
-          PUT(FTRP(new_next_bp), PACK(remain_size, 0));
-          insert_front(new_next_bp);
-        } else {
-          PUT(HDRP(ptr), PACK(total_size, 1));
-          PUT(FTRP(ptr), PACK(total_size, 1));
-        }
-        return ptr;
-      }
+    if ((newptr = try_merge_realloc(ptr, size))) {
+      return newptr;
     }
 
     newptr = mm_malloc(size);
@@ -475,4 +453,71 @@ size_t round_size(size_t size) {
   } // line:vm:mm:sizeadjust1
   return DSIZE *
          ((size + (2 * DSIZE) + (DSIZE - 1)) / DSIZE); // line:vm:mm:sizeadjust3
+}
+
+void *try_merge_realloc(void *bp, size_t size) {
+  /* If next block is free and size is large enough to hold
+     realloced block, then extend this block and skip the malloc and
+     free */
+  size_t oldsize = GET_SIZE(HDRP(bp));
+  size_t asize = round_size(size);
+
+  char *next_bp = NEXT_BLKP(bp);
+  char next_alloc = GET_ALLOC(HDRP(next_bp));
+  size_t next_size = GET_SIZE(HDRP(next_bp));
+
+  char *prev_bp = PREV_BLKP(bp);
+  char prev_alloc = GET_ALLOC(HDRP(prev_bp));
+  size_t prev_size = GET_SIZE(HDRP(prev_bp));
+
+  if (prev_alloc && next_alloc) {
+    return NULL;
+  }
+
+  if (prev_alloc && !next_alloc && (next_size + oldsize >= asize)) {
+    size_t total_size = next_size + oldsize;
+    unlink_blk(next_bp);
+    size_t remain_size = total_size - asize;
+    if (remain_size >= 2 * DSIZE) {
+      PUT(HDRP(bp), PACK(asize, 1));
+      PUT(FTRP(bp), PACK(asize, 1));
+      char *new_next_bp = NEXT_BLKP(bp);
+      PUT(HDRP(new_next_bp), PACK(remain_size, 0));
+      PUT(FTRP(new_next_bp), PACK(remain_size, 0));
+      insert_front(new_next_bp);
+    } else {
+      PUT(HDRP(bp), PACK(total_size, 1));
+      PUT(FTRP(bp), PACK(total_size, 1));
+    }
+    return bp;
+
+  } else if (!prev_alloc && next_alloc && (prev_size + oldsize >= asize)) {
+    return NULL;
+  } else if (!prev_alloc && !next_alloc &&
+             (prev_size + next_size + oldsize >= asize)) {
+    /* size_t total_size = prev_size + next_size + oldsize; */
+    /* size_t remain_size = total_size - asize; */
+    /* unlink_blk(prev_bp); */
+    /* unlink_blk(next_bp); */
+    /* if (size < oldsize) { */
+    /*   oldsize = size; */
+    /* } */
+    /* for (int i = 0; i < oldsize; ++i) { */
+    /*   *(prev_bp + i) = *((char*)bp + i); */
+    /* } */
+    /* if (remain_size >= 2*DSIZE) { */
+    /*   PUT(HDRP(prev_bp), PACK(asize, 1)); */
+    /*   PUT(FTRP(prev_bp), PACK(asize, 1)); */
+    /*   char *new_next_bp = NEXT_BLKP(prev_bp); */
+    /*   PUT(HDRP(new_next_bp), PACK(remain_size, 0)); */
+    /*   PUT(FTRP(new_next_bp), PACK(remain_size, 0)); */
+    /*   insert_front(new_next_bp); */
+    /* } else { */
+    /*   PUT(HDRP(prev_bp), PACK(total_size, 1)); */
+    /*   PUT(FTRP(prev_bp), PACK(total_size, 1)); */
+    /* } */
+    /* return prev_bp; */
+    return NULL;
+  }
+  return NULL;
 }
