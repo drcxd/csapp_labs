@@ -97,6 +97,7 @@ static void printblock(void *bp);
 static void checkheap(int verbose);
 static void checkblock(void *bp);
 /* static void check_free_list(); */
+static void report_heap();
 
 /*
  * mm_init - initialize the malloc package.
@@ -122,6 +123,7 @@ int mm_init(void)
     /* Extend the empty heap with a free block of CHUNKSIZE bytes */
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
         return -1;
+    report_heap();
     return 0;
 }
 /*
@@ -130,6 +132,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
+  printf("allocating %d bytes\n", size);
     size_t asize;      /* Adjusted block size */
     size_t extendsize; /* Amount to extend heap if no fit */
     char *bp;
@@ -148,14 +151,18 @@ void *mm_malloc(size_t size)
     /* Search the free list for a fit */
     if ((bp = find_fit(asize)) != NULL) {  //line:vm:mm:findfitcall
         place(bp, asize);                  //line:vm:mm:findfitplace
+        report_heap();
         return bp;
     }
 
     /* No fit found. Get more memory and place the block */
     extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
+    printf("extending heap to allocate %d bytes\n", asize);
+    report_heap();
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;                                  //line:vm:mm:growheap2
     place(bp, asize);                                 //line:vm:mm:growheap3
+    report_heap();
     return bp;
 }
 /*
@@ -163,6 +170,7 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *bp)
 {
+  printf("freeing %p\n", bp);
     /* $end mmfree */
     if (bp == 0)
         return;
@@ -179,12 +187,14 @@ void mm_free(void *bp)
     PUT(FTRP(bp), PACK(size, 0));
     insert_front(bp);
     coalesce(bp);
+    report_heap();
 }
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
 void *mm_realloc(void *ptr, size_t size)
 {
+  printf("reallocating %p\n", ptr);
     size_t oldsize;
     void *newptr;
 
@@ -202,6 +212,7 @@ void *mm_realloc(void *ptr, size_t size)
     oldsize = GET_SIZE(HDRP(ptr));
 
     if ((newptr = try_merge_realloc(ptr, size))) {
+      report_heap();
       return newptr;
     }
 
@@ -502,32 +513,61 @@ void *try_merge_realloc(void *bp, size_t size) {
     return bp;
 
   } else if (!prev_alloc && next_alloc && (prev_size + oldsize >= asize)) {
-    return NULL;
+    size_t total_size = prev_size + oldsize;
+    size_t remain_size = total_size - asize;
+    unlink_blk(prev_bp);
+    if (size < oldsize) {
+      oldsize = size;
+    }
+    for (int i = 0; i < oldsize; ++i) {
+      *(prev_bp + i) = *((char*)bp + i);
+    }
+    if (remain_size >= 2 * DSIZE) {
+      PUT(HDRP(prev_bp), PACK(asize, 1));
+      PUT(FTRP(prev_bp), PACK(asize, 1));
+      char *new_next_bp = NEXT_BLKP(prev_bp);
+      PUT(HDRP(new_next_bp), PACK(remain_size, 0));
+      PUT(FTRP(new_next_bp), PACK(remain_size, 0));
+      insert_front(new_next_bp);
+    } else {
+      PUT(HDRP(prev_bp), PACK(total_size, 1));
+      PUT(FTRP(prev_bp), PACK(total_size, 1));
+    }
+    return prev_bp;
   } else if (!prev_alloc && !next_alloc &&
              (prev_size + next_size + oldsize >= asize)) {
-    /* size_t total_size = prev_size + next_size + oldsize; */
-    /* size_t remain_size = total_size - asize; */
-    /* unlink_blk(prev_bp); */
-    /* unlink_blk(next_bp); */
-    /* if (size < oldsize) { */
-    /*   oldsize = size; */
-    /* } */
-    /* for (int i = 0; i < oldsize; ++i) { */
-    /*   *(prev_bp + i) = *((char*)bp + i); */
-    /* } */
-    /* if (remain_size >= 2*DSIZE) { */
-    /*   PUT(HDRP(prev_bp), PACK(asize, 1)); */
-    /*   PUT(FTRP(prev_bp), PACK(asize, 1)); */
-    /*   char *new_next_bp = NEXT_BLKP(prev_bp); */
-    /*   PUT(HDRP(new_next_bp), PACK(remain_size, 0)); */
-    /*   PUT(FTRP(new_next_bp), PACK(remain_size, 0)); */
-    /*   insert_front(new_next_bp); */
-    /* } else { */
-    /*   PUT(HDRP(prev_bp), PACK(total_size, 1)); */
-    /*   PUT(FTRP(prev_bp), PACK(total_size, 1)); */
-    /* } */
-    /* return prev_bp; */
-    return NULL;
+    size_t total_size = prev_size + next_size + oldsize;
+    size_t remain_size = total_size - asize;
+    unlink_blk(prev_bp);
+    unlink_blk(next_bp);
+    if (size < oldsize) {
+      oldsize = size;
+    }
+    for (int i = 0; i < oldsize; ++i) {
+      *(prev_bp + i) = *((char*)bp + i);
+    }
+    if (remain_size >= 2*DSIZE) {
+      PUT(HDRP(prev_bp), PACK(asize, 1));
+      PUT(FTRP(prev_bp), PACK(asize, 1));
+      char *new_next_bp = NEXT_BLKP(prev_bp);
+      PUT(HDRP(new_next_bp), PACK(remain_size, 0));
+      PUT(FTRP(new_next_bp), PACK(remain_size, 0));
+      insert_front(new_next_bp);
+    } else {
+      PUT(HDRP(prev_bp), PACK(total_size, 1));
+      PUT(FTRP(prev_bp), PACK(total_size, 1));
+    }
+    return prev_bp;
   }
   return NULL;
+}
+
+static void report_heap() {
+  printf("reporting heap...\n");
+  char *bp;
+  int i = 0;
+  for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+    printf("block: %d\taddress: %p\tsize: %d\tallocated:%d\n", i, bp, GET_SIZE(HDRP(bp)), GET_ALLOC(HDRP(bp)));
+    ++i;
+  }
 }
