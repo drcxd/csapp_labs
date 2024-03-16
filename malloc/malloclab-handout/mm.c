@@ -87,7 +87,7 @@ static char *rover;           /* Next fit rover */
 
 /* Function prototypes for internal helper routines */
 static void *extend_heap(size_t words);
-static void place(void *bp, size_t asize);
+static void* place(void *bp, size_t asize);
 static void *find_fit(size_t asize);
 static void *coalesce(void *bp);
 static void unlink_blk(void *bp);
@@ -100,8 +100,8 @@ static void checkblock(void *bp);
 /* static void check_free_list(); */
 static void report_heap();
 
-/* #define DBGLOG */
-#ifdef DBGLOG
+/* #define DBGLG */
+#ifdef DBGLG
 #define PRTF(fmt, ...) (printf(fmt, __VA_ARGS__))
 #else
 #define PRTF(fmt, ...)
@@ -141,7 +141,6 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-  PRTF("allocating %d bytes\n", size);
     size_t asize;      /* Adjusted block size */
     size_t extendsize; /* Amount to extend heap if no fit */
     char *bp;
@@ -157,25 +156,26 @@ void *mm_malloc(size_t size)
 
     /* Adjust block size to include overhead and alignment reqs. */
     asize = round_size(size);
+    PRTF("allocating %d bytes\n", asize);
     /* Search the free list for a fit */
     if ((bp = find_fit(asize)) != NULL) {  //line:vm:mm:findfitcall
-        place(bp, asize);                  //line:vm:mm:findfitplace
-        report_heap();
-        return bp;
+        /* place(bp, asize);                  //line:vm:mm:findfitplace */
+        /* return bp; */
+      return place(bp, asize);
     }
 
     /* No fit found. Get more memory and place the block */
     extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
-    PRTF("extending heap to allocate %d bytes\n", asize);
+    PRTF("extending heap...\n", 1);
     char* last_block = epilogue_header - GET_SIZE(epilogue_header - WSIZE) + WSIZE;
     if (!GET_ALLOC(HDRP(last_block))) {
       extendsize -= GET_SIZE(HDRP(last_block));
     }
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;                                  //line:vm:mm:growheap2
-    place(bp, asize);                                 //line:vm:mm:growheap3
-    report_heap();
-    return bp;
+    /* place(bp, asize);                                 //line:vm:mm:growheap3 */
+    /* return bp; */
+    return place(bp, asize);
 }
 /*
  * mm_free - Freeing a block does nothing.
@@ -342,23 +342,43 @@ static void *extend_heap(size_t words)
     return bp;
 }
 
-static void place(void *bp, size_t asize)
+static void *place(void *bp, size_t asize)
 {
     size_t csize = GET_SIZE(HDRP(bp));
     unlink_blk(bp);
 
-    if ((csize - asize) >= (2*DSIZE)) {
+    /* if (asize <= 72) { */
+    if (asize > 72) {
+      /* place to front */
+      if ((csize - asize) >= (2 * DSIZE)) {
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
         bp = NEXT_BLKP(bp);
-        PUT(HDRP(bp), PACK(csize-asize, 0));
-        PUT(FTRP(bp), PACK(csize-asize, 0));
+        PUT(HDRP(bp), PACK(csize - asize, 0));
+        PUT(FTRP(bp), PACK(csize - asize, 0));
         insert_front(bp);
-    }
-    else {
+        bp = PREV_BLKP(bp);
+      } else {
         PUT(HDRP(bp), PACK(csize, 1));
         PUT(FTRP(bp), PACK(csize, 1));
+      }
+    } else {
+      /* place to end */
+      if ((csize - asize) >= (2 * DSIZE)) {
+        PUT(HDRP(bp), PACK(csize - asize, 0));
+        PUT(FTRP(bp), PACK(csize - asize, 0));
+        insert_front(bp);
+        bp = NEXT_BLKP(bp);
+        PUT(HDRP(bp), PACK(asize, 1));
+        PUT(FTRP(bp), PACK(asize, 1));
+      } else {
+        PUT(HDRP(bp), PACK(csize, 1));
+        PUT(FTRP(bp), PACK(csize, 1));
+      }
     }
+
+    report_heap();
+    return bp;
 }
 
 static void *find_fit(size_t asize)
@@ -594,7 +614,7 @@ void *try_merge_realloc(void *bp, size_t size) {
 }
 
 void report_heap() {
-#ifdef DBGLOG
+#ifdef DBGLG
   printf("reporting heap...\n");
   char *bp;
   int i = 0;
