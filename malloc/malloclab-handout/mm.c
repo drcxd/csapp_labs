@@ -347,9 +347,7 @@ static void *place(void *bp, size_t asize)
     size_t csize = GET_SIZE(HDRP(bp));
     unlink_blk(bp);
 
-    /* if (asize <= 72) { */
-    /* if (asize > 136) { */
-    if (asize > 72) {
+    if (asize > 136 || asize == 120) {
       /* place to front */
       if ((csize - asize) >= (2 * DSIZE)) {
         PUT(HDRP(bp), PACK(asize, 1));
