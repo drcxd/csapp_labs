@@ -206,7 +206,7 @@ void mm_free(void *bp)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-  PRTF("reallocating %p\n", ptr);
+  PRTF("reallocating %p to size %d\n", ptr, round_size(size));
     size_t oldsize;
     void *newptr;
 
@@ -348,6 +348,7 @@ static void *place(void *bp, size_t asize)
     unlink_blk(bp);
 
     /* if (asize <= 72) { */
+    /* if (asize > 136) { */
     if (asize > 72) {
       /* place to front */
       if ((csize - asize) >= (2 * DSIZE)) {
@@ -531,6 +532,24 @@ void *try_merge_realloc(void *bp, size_t size) {
      free */
   size_t oldsize = GET_SIZE(HDRP(bp));
   size_t asize = round_size(size);
+
+  if (asize < oldsize) {
+    size_t remain_size = oldsize - asize;
+    /* if ((oldsize /remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) { */
+    if (remain_size >= 2*DSIZE) {
+      PUT(HDRP(bp), PACK(asize, 1));
+      PUT(FTRP(bp), PACK(asize, 1));
+      char *new_next_bp = NEXT_BLKP(bp);
+      PUT(HDRP(new_next_bp), PACK(remain_size, 0));
+      PUT(FTRP(new_next_bp), PACK(remain_size, 0));
+      insert_front(new_next_bp);
+      coalesce(new_next_bp);
+    } else {
+      PUT(HDRP(bp), PACK(oldsize, 1));
+      PUT(FTRP(bp), PACK(oldsize, 1));
+    }
+    return bp;
+  }
 
   char *next_bp = NEXT_BLKP(bp);
   char next_alloc = GET_ALLOC(HDRP(next_bp));
