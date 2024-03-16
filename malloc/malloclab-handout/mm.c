@@ -99,6 +99,7 @@ static void checkblock(void *bp);
 /* static void check_free_list(); */
 static void report_heap();
 
+/* #define DBGLOG */
 #ifdef DBGLOG
 #define PRTF(fmt, ...) (printf(fmt, __VA_ARGS__))
 #else
@@ -164,7 +165,6 @@ void *mm_malloc(size_t size)
     /* No fit found. Get more memory and place the block */
     extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
     PRTF("extending heap to allocate %d bytes\n", asize);
-    report_heap();
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;                                  //line:vm:mm:growheap2
     place(bp, asize);                                 //line:vm:mm:growheap3
@@ -482,6 +482,7 @@ size_t round_size(size_t size) {
          ((size + (1 * DSIZE) + (DSIZE - 1)) / DSIZE); // line:vm:mm:sizeadjust3
 }
 
+#define SPLIT_RATIO 2
 void *try_merge_realloc(void *bp, size_t size) {
   /* If next block is free and size is large enough to hold
      realloced block, then extend this block and skip the malloc and
@@ -506,7 +507,7 @@ void *try_merge_realloc(void *bp, size_t size) {
     unlink_blk(next_bp);
     size_t remain_size = total_size - asize;
     /* if (remain_size >= 2 * DSIZE) { */
-    if ((total_size / remain_size) <= 4 && remain_size >= 2*DSIZE) {
+    if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) {
       PUT(HDRP(bp), PACK(asize, 1));
       PUT(FTRP(bp), PACK(asize, 1));
       char *new_next_bp = NEXT_BLKP(bp);
@@ -529,7 +530,7 @@ void *try_merge_realloc(void *bp, size_t size) {
     for (int i = 0; i < oldsize; ++i) {
       *(prev_bp + i) = *((char*)bp + i);
     }
-    if (remain_size >= 2 * DSIZE) {
+    if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2 * DSIZE) {
       PUT(HDRP(prev_bp), PACK(asize, 1));
       PUT(FTRP(prev_bp), PACK(asize, 1));
       char *new_next_bp = NEXT_BLKP(prev_bp);
@@ -553,7 +554,8 @@ void *try_merge_realloc(void *bp, size_t size) {
     for (int i = 0; i < oldsize; ++i) {
       *(prev_bp + i) = *((char*)bp + i);
     }
-    if (remain_size >= 2*DSIZE) {
+    /* if (remain_size >= 2*DSIZE) { */
+    if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) {
       PUT(HDRP(prev_bp), PACK(asize, 1));
       PUT(FTRP(prev_bp), PACK(asize, 1));
       char *new_next_bp = NEXT_BLKP(prev_bp);
