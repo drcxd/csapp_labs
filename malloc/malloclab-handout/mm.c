@@ -80,6 +80,7 @@ team_t team = {
 /* Global variables */
 static char *heap_listp = 0;  /* Pointer to first block */
 static char *first_free = 0;
+static char *epilogue_header = 0;
 #ifdef NEXT_FIT
 static char *rover;           /* Next fit rover */
 #endif
@@ -120,6 +121,7 @@ int mm_init(void)
     PUT(heap_listp + (3*WSIZE), PACK(0, 1));     /* Epilogue header */
     heap_listp += (2*WSIZE);                     //line:vm:mm:endinit
     first_free = NULL;
+    epilogue_header = heap_listp + WSIZE;
     /* $end mminit */
 
 #ifdef NEXT_FIT
@@ -165,6 +167,10 @@ void *mm_malloc(size_t size)
     /* No fit found. Get more memory and place the block */
     extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
     PRTF("extending heap to allocate %d bytes\n", asize);
+    char* last_block = epilogue_header - GET_SIZE(epilogue_header - WSIZE) + WSIZE;
+    if (!GET_ALLOC(HDRP(last_block))) {
+      extendsize -= GET_SIZE(HDRP(last_block));
+    }
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;                                  //line:vm:mm:growheap2
     place(bp, asize);                                 //line:vm:mm:growheap3
@@ -310,14 +316,30 @@ static void *extend_heap(size_t words)
     if ((long)(bp = mem_sbrk(size)) == -1)
         return NULL;                                        //line:vm:mm:endextend
 
-    /* Initialize free block header/footer and the epilogue header */
-    PUT(HDRP(bp), PACK(size, 0));         /* Free block header */   //line:vm:mm:freeblockhdr
-    PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */   //line:vm:mm:freeblockftr
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */ //line:vm:mm:newepihdr
-    insert_front(bp);
+    char* last_block = epilogue_header - GET_SIZE(epilogue_header - WSIZE) + WSIZE;
+    if (!GET_ALLOC(HDRP(last_block))) {
+      size_t oldsize = GET_SIZE(HDRP(last_block));
+      PUT(HDRP(last_block), PACK(size + oldsize, 0));
+      PUT(FTRP(last_block), PACK(size + oldsize, 0));
+      PUT(HDRP(NEXT_BLKP(last_block)), PACK(0, 1));
+      epilogue_header = NEXT_BLKP(last_block) - 4;
+      bp = last_block;
+    } else {
+      /* Initialize free block header/footer and the epilogue header */
+      PUT(HDRP(bp), PACK(size, 0));
+          /* Free block header */ // line:vm:mm:freeblockhdr
+      PUT(FTRP(bp), PACK(size, 0));
+          /* Free block footer */ // line:vm:mm:freeblockftr
+      PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
+          /* New epilogue header */ // line:vm:mm:newepihdr
+      epilogue_header = NEXT_BLKP(bp) - 4;
+      insert_front(bp);
+      bp = coalesce(bp);
+    }
+
 
     /* Coalesce if the previous block was free */
-    return coalesce(bp);                                          //line:vm:mm:returnblock
+    return bp;
 }
 
 static void place(void *bp, size_t asize)
