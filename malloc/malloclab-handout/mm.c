@@ -99,6 +99,12 @@ static void checkblock(void *bp);
 /* static void check_free_list(); */
 static void report_heap();
 
+#ifdef DBGLOG
+#define PRTF(fmt, ...) (printf(fmt, __VA_ARGS__))
+#else
+#define PRTF(fmt, ...)
+#endif
+
 /*
  * mm_init - initialize the malloc package.
  */
@@ -132,7 +138,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-  printf("allocating %d bytes\n", size);
+  PRTF("allocating %d bytes\n", size);
     size_t asize;      /* Adjusted block size */
     size_t extendsize; /* Amount to extend heap if no fit */
     char *bp;
@@ -157,7 +163,7 @@ void *mm_malloc(size_t size)
 
     /* No fit found. Get more memory and place the block */
     extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
-    printf("extending heap to allocate %d bytes\n", asize);
+    PRTF("extending heap to allocate %d bytes\n", asize);
     report_heap();
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;                                  //line:vm:mm:growheap2
@@ -170,7 +176,7 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *bp)
 {
-  printf("freeing %p\n", bp);
+  PRTF("freeing %p\n", bp);
     /* $end mmfree */
     if (bp == 0)
         return;
@@ -194,7 +200,7 @@ void mm_free(void *bp)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-  printf("reallocating %p\n", ptr);
+  PRTF("reallocating %p\n", ptr);
     size_t oldsize;
     void *newptr;
 
@@ -499,7 +505,8 @@ void *try_merge_realloc(void *bp, size_t size) {
     size_t total_size = next_size + oldsize;
     unlink_blk(next_bp);
     size_t remain_size = total_size - asize;
-    if (remain_size >= 2 * DSIZE) {
+    /* if (remain_size >= 2 * DSIZE) { */
+    if ((total_size / remain_size) <= 4 && remain_size >= 2*DSIZE) {
       PUT(HDRP(bp), PACK(asize, 1));
       PUT(FTRP(bp), PACK(asize, 1));
       char *new_next_bp = NEXT_BLKP(bp);
@@ -562,7 +569,8 @@ void *try_merge_realloc(void *bp, size_t size) {
   return NULL;
 }
 
-static void report_heap() {
+void report_heap() {
+#ifdef DBGLOG
   printf("reporting heap...\n");
   char *bp;
   int i = 0;
@@ -570,4 +578,5 @@ static void report_heap() {
     printf("block: %d\taddress: %p\tsize: %d\tallocated:%d\n", i, bp, GET_SIZE(HDRP(bp)), GET_ALLOC(HDRP(bp)));
     ++i;
   }
+#endif
 }
