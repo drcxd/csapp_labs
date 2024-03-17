@@ -51,7 +51,7 @@ team_t team = {
 #define WSIZE 4
 #define DSIZE 8
 #define CHUNKSIZE (1 << 12)
-#define SMALL_BLOCK_CHUNKSIZE (1 << 10)
+#define SMALL_BLOCK_CHUNKSIZE (1 << 12)
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
@@ -315,7 +315,6 @@ static void *extend_heap(size_t words)
       epilogue_header = NEXT_BLKP(last_block) - 4;
       bp = last_block;
       insert_front(last_block);
-      /* FIXME: this changes the size of the last_block but does not move it to the correct list ! */
     } else {
       /* Initialize free block header/footer and the epilogue header */
       PUT(HDRP(bp), PACK(size, 0));
@@ -691,6 +690,17 @@ void **partition_block_by_size(void *bp, size_t size) {
   size_t bsize = GET_SIZE(HDRP(bp));
   assert(bsize >= SMALL_BLOCK_SIZE);
   unlink_blk(bp);
+
+  if (bsize > SMALL_BLOCK_CHUNKSIZE && bsize - SMALL_BLOCK_CHUNKSIZE >= 2*DSIZE) {
+    size_t rsize = bsize - SMALL_BLOCK_CHUNKSIZE;
+    PUT(HDRP(bp), PACK(SMALL_BLOCK_CHUNKSIZE, 0));
+    PUT(FTRP(bp), PACK(SMALL_BLOCK_CHUNKSIZE, 0));
+    void** next = (void**)NEXT_BLKP(bp);
+    PUT(HDRP(next), PACK(rsize, 0));
+    PUT(FTRP(next), PACK(rsize, 0));
+    insert_front(next);
+    bsize = SMALL_BLOCK_CHUNKSIZE;
+  }
 
   void **list = get_list_by_size(size);
   void **to_return = NULL;
