@@ -476,6 +476,10 @@ void *try_merge_realloc(void *bp, size_t size) {
   size_t oldsize = GET_SIZE(HDRP(bp));
   size_t asize = round_size(size);
 
+  /* if (asize <= oldsize) { */
+  /*   return bp; */
+  /* } */
+
   /* if (asize < oldsize) { */
   /*   size_t remain_size = oldsize - asize; */
   /*   /\* if ((oldsize /remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) { *\/ */
@@ -506,7 +510,7 @@ void *try_merge_realloc(void *bp, size_t size) {
     return NULL;
   }
 
-  if (prev_alloc && !next_alloc && (next_size + oldsize >= asize) && !is_small_block(next_bp)) {
+  if (!next_alloc && (next_size + oldsize >= asize) && !is_small_block(next_bp)) {
     size_t total_size = next_size + oldsize;
     unlink_blk(&big_free, next_bp);
     size_t remain_size = total_size - asize;
@@ -523,8 +527,9 @@ void *try_merge_realloc(void *bp, size_t size) {
       PUT(FTRP(bp), PACK(total_size, 1));
     }
     return bp;
+  }
 
-  } else if (!prev_alloc && next_alloc && (prev_size + oldsize >= asize) && !is_small_block(prev_bp)) {
+  if (!prev_alloc && (prev_size + oldsize >= asize) && !is_small_block(prev_bp)) {
     size_t total_size = prev_size + oldsize;
     size_t remain_size = total_size - asize;
     unlink_blk(&big_free, prev_bp);
@@ -547,8 +552,10 @@ void *try_merge_realloc(void *bp, size_t size) {
       PUT(FTRP(prev_bp), PACK(total_size, 1));
     }
     return prev_bp;
-  } else if (!prev_alloc && !next_alloc &&
-             (prev_size + next_size + oldsize >= asize)) {
+  }
+
+  if (!prev_alloc && !next_alloc &&
+      (prev_size + next_size + oldsize >= asize)) {
     return NULL;
     size_t total_size = prev_size + next_size + oldsize;
     size_t remain_size = total_size - asize;
@@ -583,7 +590,9 @@ void report_heap() {
   char *bp;
   int i = 0;
   for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-    printf("block: %d\taddress: %p\tsize: %d\tallocated:%d\n", i, bp, GET_SIZE(HDRP(bp)), GET_ALLOC(HDRP(bp)));
+    if (!is_small_block(bp)) {
+      printf("block: %d\taddress: %p\tsize: %d\tallocated:%d\n", i, bp, GET_SIZE(HDRP(bp)), GET_ALLOC(HDRP(bp)));
+    }
     ++i;
   }
 #endif
