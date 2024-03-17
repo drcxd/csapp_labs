@@ -223,10 +223,10 @@ void *mm_realloc(void *ptr, size_t size)
 
     oldsize = GET_SIZE(HDRP(ptr));
 
-    if ((newptr = try_merge_realloc(ptr, size))) {
-      report_heap();
-      return newptr;
-    }
+    /* if ((newptr = try_merge_realloc(ptr, size))) { */
+    /*   report_heap(); */
+    /*   return newptr; */
+    /* } */
 
     newptr = mm_malloc(size);
 
@@ -298,16 +298,6 @@ void mm_checkheap(int verbose)
 
 static void *extend_heap(size_t words)
 {
-
-  /* { */
-  /*   char *bp; */
-  /*   for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) { */
-  /*     if (!GET_ALLOC(HDRP(bp))) { */
-  /*       coalesce(bp); */
-  /*     } */
-  /*   } */
-  /* } */
-
     char *bp;
     size_t size;
 
@@ -342,40 +332,22 @@ static void *extend_heap(size_t words)
     return bp;
 }
 
-static void *place(void *bp, size_t asize)
-{
+static void *place(void *bp, size_t asize) {
     size_t csize = GET_SIZE(HDRP(bp));
     unlink_blk(bp);
 
-    if (asize > 136 || asize == 120) {
-      /* place to front */
-      if ((csize - asize) >= (2 * DSIZE)) {
-        PUT(HDRP(bp), PACK(asize, 1));
-        PUT(FTRP(bp), PACK(asize, 1));
-        bp = NEXT_BLKP(bp);
-        PUT(HDRP(bp), PACK(csize - asize, 0));
-        PUT(FTRP(bp), PACK(csize - asize, 0));
-        insert_front(bp);
-        bp = PREV_BLKP(bp);
-      } else {
-        PUT(HDRP(bp), PACK(csize, 1));
-        PUT(FTRP(bp), PACK(csize, 1));
-      }
+    if ((csize - asize) >= (2 * DSIZE)) {
+      PUT(HDRP(bp), PACK(asize, 1));
+      PUT(FTRP(bp), PACK(asize, 1));
+      bp = NEXT_BLKP(bp);
+      PUT(HDRP(bp), PACK(csize - asize, 0));
+      PUT(FTRP(bp), PACK(csize - asize, 0));
+      insert_front(bp);
+      bp = PREV_BLKP(bp);
     } else {
-      /* place to end */
-      if ((csize - asize) >= (2 * DSIZE)) {
-        PUT(HDRP(bp), PACK(csize - asize, 0));
-        PUT(FTRP(bp), PACK(csize - asize, 0));
-        insert_front(bp);
-        bp = NEXT_BLKP(bp);
-        PUT(HDRP(bp), PACK(asize, 1));
-        PUT(FTRP(bp), PACK(asize, 1));
-      } else {
-        PUT(HDRP(bp), PACK(csize, 1));
-        PUT(FTRP(bp), PACK(csize, 1));
-      }
+      PUT(HDRP(bp), PACK(csize, 1));
+      PUT(FTRP(bp), PACK(csize, 1));
     }
-
     report_heap();
     return bp;
 }
