@@ -112,7 +112,8 @@ static void **partition_block_by_size(void *bp, size_t size);
 #define PRTF(fmt, ...)
 #endif
 
-#define SMALL_BLOCK_SIZE 256
+/* #define SMALL_BLOCK_SIZE 256 */
+#define SMALL_BLOCK_SIZE 112
 #define SMALL_LIST_SIZE 31 /* 256/8 - 1*/
 void **small_lists = NULL;
 
@@ -124,7 +125,7 @@ int mm_init(void)
     /* Create the initial empty heap */
   if ((heap_listp = mem_sbrk(34*WSIZE)) == (void *)-1) /* 31 + 3 */
         return -1;
-  small_lists = heap_listp;
+  small_lists = (void**)heap_listp;
   bzero(heap_listp, SMALL_LIST_SIZE * PSIZE);
   heap_listp += SMALL_LIST_SIZE * PSIZE - PSIZE;
   PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); /* Prologue header */
@@ -239,10 +240,12 @@ void *mm_realloc(void *ptr, size_t size)
 
     oldsize = GET_SIZE(HDRP(ptr));
 
-    /* if ((newptr = try_merge_realloc(ptr, size))) { */
-    /*   report_heap(); */
-    /*   return newptr; */
-    /* } */
+    if (oldsize > SMALL_BLOCK_SIZE && size > SMALL_BLOCK_SIZE)  {
+      if ((newptr = try_merge_realloc(ptr, size))) {
+        report_heap();
+        return newptr;
+      }
+    }
 
     newptr = mm_malloc(size);
 
@@ -473,23 +476,23 @@ void *try_merge_realloc(void *bp, size_t size) {
   size_t oldsize = GET_SIZE(HDRP(bp));
   size_t asize = round_size(size);
 
-  if (asize < oldsize) {
-    size_t remain_size = oldsize - asize;
-    /* if ((oldsize /remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) { */
-    if (remain_size >= 2*DSIZE) {
-      PUT(HDRP(bp), PACK(asize, 1));
-      PUT(FTRP(bp), PACK(asize, 1));
-      char *new_next_bp = NEXT_BLKP(bp);
-      PUT(HDRP(new_next_bp), PACK(remain_size, 0));
-      PUT(FTRP(new_next_bp), PACK(remain_size, 0));
-      insert_front(&big_free, new_next_bp);
-      coalesce(new_next_bp);
-    } else {
-      PUT(HDRP(bp), PACK(oldsize, 1));
-      PUT(FTRP(bp), PACK(oldsize, 1));
-    }
-    return bp;
-  }
+  /* if (asize < oldsize) { */
+  /*   size_t remain_size = oldsize - asize; */
+  /*   /\* if ((oldsize /remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) { *\/ */
+  /*   if (remain_size >= SMALL_BLOCK_SIZE) { */
+  /*     PUT(HDRP(bp), PACK(asize, 1)); */
+  /*     PUT(FTRP(bp), PACK(asize, 1)); */
+  /*     char *new_next_bp = NEXT_BLKP(bp); */
+  /*     PUT(HDRP(new_next_bp), PACK(remain_size, 0)); */
+  /*     PUT(FTRP(new_next_bp), PACK(remain_size, 0)); */
+  /*     insert_front(&big_free, new_next_bp); */
+  /*     coalesce(new_next_bp); */
+  /*   } else { */
+  /*     PUT(HDRP(bp), PACK(oldsize, 1)); */
+  /*     PUT(FTRP(bp), PACK(oldsize, 1)); */
+  /*   } */
+  /*   return bp; */
+  /* } */
 
   char *next_bp = NEXT_BLKP(bp);
   char next_alloc = GET_ALLOC(HDRP(next_bp));
@@ -503,12 +506,12 @@ void *try_merge_realloc(void *bp, size_t size) {
     return NULL;
   }
 
-  if (prev_alloc && !next_alloc && (next_size + oldsize >= asize)) {
+  if (prev_alloc && !next_alloc && (next_size + oldsize >= asize) && !is_small_block(next_bp)) {
     size_t total_size = next_size + oldsize;
     unlink_blk(&big_free, next_bp);
     size_t remain_size = total_size - asize;
-    /* if (remain_size >= 2 * DSIZE) { */
-    if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) {
+    if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= SMALL_BLOCK_SIZE) {
+    /* if (remain_size >= SMALL_BLOCK_SIZE) { */
       PUT(HDRP(bp), PACK(asize, 1));
       PUT(FTRP(bp), PACK(asize, 1));
       char *new_next_bp = NEXT_BLKP(bp);
@@ -521,7 +524,7 @@ void *try_merge_realloc(void *bp, size_t size) {
     }
     return bp;
 
-  } else if (!prev_alloc && next_alloc && (prev_size + oldsize >= asize)) {
+  } else if (!prev_alloc && next_alloc && (prev_size + oldsize >= asize) && !is_small_block(prev_bp)) {
     size_t total_size = prev_size + oldsize;
     size_t remain_size = total_size - asize;
     unlink_blk(&big_free, prev_bp);
@@ -531,7 +534,8 @@ void *try_merge_realloc(void *bp, size_t size) {
     for (int i = 0; i < oldsize; ++i) {
       *(prev_bp + i) = *((char*)bp + i);
     }
-    if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2 * DSIZE) {
+    if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= SMALL_BLOCK_SIZE) {
+    /* if (remain_size >= SMALL_BLOCK_SIZE) { */
       PUT(HDRP(prev_bp), PACK(asize, 1));
       PUT(FTRP(prev_bp), PACK(asize, 1));
       char *new_next_bp = NEXT_BLKP(prev_bp);
@@ -545,6 +549,7 @@ void *try_merge_realloc(void *bp, size_t size) {
     return prev_bp;
   } else if (!prev_alloc && !next_alloc &&
              (prev_size + next_size + oldsize >= asize)) {
+    return NULL;
     size_t total_size = prev_size + next_size + oldsize;
     size_t remain_size = total_size - asize;
     unlink_blk(&big_free, prev_bp);
