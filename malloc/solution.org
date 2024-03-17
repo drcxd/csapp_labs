@@ -1,0 +1,32 @@
+
+* Dedicated Small Blocks
+
+I want to try implement another solution of malloc:
+
+small blocks (whose allocated size is smaller than 256) use dedicated
+blocks of exact size. The free blocks are stored in a explicit list
+and. These small blocks never coalesce with other blocks. However, how
+many such blocks should be allocated when the first request for such
+blocks appear? Let's first assume the number is K.
+
+Currently, the minimal block size is 16 bytes, and all allocated
+blocks' sizes should be a multiple of 8. Thus, we have 16, 24, ...,
+256, total (256/8)-1 =31 different sizes.
+
+The start of the list for each size should be stored at the beginning
+of the heap, initially set to NULL.
+
+When there is no free small blocks of certain size, we have to
+allocate K new blocks of such size, add it to the list, then return
+one of the newly created block.
+
+* Reuse Dedicated Small Blocks
+
+When dedicated small blocks can handle interleaved allocation of
+different sizes of small blocks, it causes the problem that large
+chunks of dedicated small blocks can not be reused when they are free.
+
+After a dedicated small block is freed, we can check if all the other
+dedicated small blocks of the same size that belongs to the same
+larger block are all freed, and if so, we can reuse the whole larger
+block.
