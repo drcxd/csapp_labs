@@ -102,6 +102,8 @@ static void report_heap();
 static char is_small_block(void *bp);
 static void *try_coalesce_with_prev(void *bp);
 static void *try_coalesce_with_next(void *bp);
+static void **get_list_by_size(size_t size);
+static void **partition_block_by_size(void *bp, size_t size);
 
 /* #define DBGLG */
 #ifdef DBGLG
@@ -177,13 +179,17 @@ void *mm_malloc(size_t size)
     extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
     PRTF("extending heap...\n", 1);
     char* last_block = epilogue_header - GET_SIZE(epilogue_header - WSIZE) + WSIZE;
-    if (!GET_ALLOC(HDRP(last_block))) {
+    if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) {
       extendsize -= GET_SIZE(HDRP(last_block));
     }
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;                                  //line:vm:mm:growheap2
-    /* place(bp, asize);                                 //line:vm:mm:growheap3 */
-    /* return bp; */
+    if (asize <= SMALL_BLOCK_SIZE) {
+      /* Partition new allocated block into small blocks and append to
+         the corresponding list */
+      bp = (char*)partition_block_by_size(bp, asize);
+      assert(GET_SIZE(HDRP(bp)) == asize);
+    }
     return place(bp, asize);
 }
 /*
@@ -206,7 +212,8 @@ void mm_free(void *bp)
 
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
-    insert_front(&big_free, bp);
+    void **list = get_list_by_size(size);
+    insert_front(list, bp);
     coalesce(bp);
     report_heap();
 }
@@ -257,6 +264,9 @@ void *mm_realloc(void *ptr, size_t size)
 
 static void *coalesce(void *bp)
 {
+  if (is_small_block(bp)) {
+    return bp;
+  }
   bp = try_coalesce_with_next(bp);
   bp = try_coalesce_with_prev(bp);
   return bp;
@@ -278,7 +288,7 @@ static void *extend_heap(size_t words)
         return NULL;                                        //line:vm:mm:endextend
 
     char* last_block = epilogue_header - GET_SIZE(epilogue_header - WSIZE) + WSIZE;
-    if (!GET_ALLOC(HDRP(last_block))) {
+    if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) {
       size_t oldsize = GET_SIZE(HDRP(last_block));
       PUT(HDRP(last_block), PACK(size + oldsize, 0));
       PUT(FTRP(last_block), PACK(size + oldsize, 0));
@@ -304,20 +314,28 @@ static void *extend_heap(size_t words)
 }
 
 static void *place(void *bp, size_t asize) {
+  assert(!GET_ALLOC(HDRP(bp)));
     size_t csize = GET_SIZE(HDRP(bp));
-    unlink_blk(&big_free, bp);
+    void **list = get_list_by_size(csize);
+    unlink_blk(list, bp);
 
-    if ((csize - asize) >= (2 * DSIZE)) {
+    if (asize <= SMALL_BLOCK_SIZE) {
+      assert(asize == csize);
       PUT(HDRP(bp), PACK(asize, 1));
       PUT(FTRP(bp), PACK(asize, 1));
-      bp = NEXT_BLKP(bp);
-      PUT(HDRP(bp), PACK(csize - asize, 0));
-      PUT(FTRP(bp), PACK(csize - asize, 0));
-      insert_front(&big_free, bp);
-      bp = PREV_BLKP(bp);
     } else {
-      PUT(HDRP(bp), PACK(csize, 1));
-      PUT(FTRP(bp), PACK(csize, 1));
+      if ((csize - asize) > SMALL_BLOCK_SIZE) {
+        PUT(HDRP(bp), PACK(asize, 1));
+        PUT(FTRP(bp), PACK(asize, 1));
+        bp = NEXT_BLKP(bp);
+        PUT(HDRP(bp), PACK(csize - asize, 0));
+        PUT(FTRP(bp), PACK(csize - asize, 0));
+        insert_front(&big_free, bp);
+        bp = PREV_BLKP(bp);
+      } else {
+        PUT(HDRP(bp), PACK(csize, 1));
+        PUT(FTRP(bp), PACK(csize, 1));
+      }
     }
     report_heap();
     return bp;
@@ -326,6 +344,15 @@ static void *place(void *bp, size_t asize) {
 static void *find_fit(size_t asize)
 {
     void** it;
+    if (asize <= SMALL_BLOCK_SIZE) {
+      it = get_list_by_size(asize);
+      if (*it != NULL) {
+        assert(!GET_ALLOC(HDRP(*it)));
+        return *it;
+      }
+      return NULL;
+    }
+
     it = big_free;
     void **best_fit = NULL;
     unsigned best_diff = UINT32_MAX;
@@ -558,8 +585,8 @@ void report_heap() {
 }
 
 char is_small_block(void *bp) {
-  /* return GET_SIZE(HDRP(bp)) <= SMALL_BLOCK_SIZE; */
-  return 0;
+  return GET_SIZE(HDRP(bp)) <= SMALL_BLOCK_SIZE;
+  /* return 0; */
 }
 
 void *try_coalesce_with_prev(void *bp) {
@@ -593,4 +620,40 @@ void *try_coalesce_with_next(void *bp) {
     PUT(FTRP(bp), PACK(size, 0));
   }
   return bp;
+}
+
+void **get_list_by_size(size_t size) {
+  if (size <= SMALL_BLOCK_SIZE) {
+    return small_lists + (size / 8) - 2;
+  }
+  return &big_free;
+}
+
+void **partition_block_by_size(void *bp, size_t size) {
+  size_t bsize = GET_SIZE(HDRP(bp));
+  assert(bsize >= SMALL_BLOCK_SIZE);
+  unlink_blk(&big_free, bp);
+
+  void **list = get_list_by_size(size);
+  void **to_return = NULL;
+  while (bsize >= size && bsize - size >= 2*DSIZE) {
+    /* partition the block */
+    PUT(HDRP(bp), PACK(size, 0));
+    PUT(FTRP(bp), PACK(size, 0));
+    insert_front(list, bp);
+    void *next = NEXT_BLKP(bp);
+    PUT(HDRP(next), PACK(bsize - size, 0));
+    PUT(FTRP(next), PACK(bsize - size, 0));
+    bsize -= size;
+    bp = next;
+  }
+  to_return = *list;
+  if (bsize > 0) {
+    assert(bsize >= 2*DSIZE);
+    assert(GET_SIZE(HDRP(bp)) == bsize);
+    list = get_list_by_size(bsize);
+    insert_front(list, bp);
+  }
+  assert(to_return);
+  return to_return;
 }
