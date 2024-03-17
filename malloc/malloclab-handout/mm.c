@@ -104,6 +104,7 @@ static void *try_coalesce_with_prev(void *bp);
 static void *try_coalesce_with_next(void *bp);
 static void **get_list_by_size(size_t size);
 static void **partition_block_by_size(void *bp, size_t size);
+static void **get_last_block();
 
 /* #define DBGLG */
 #ifdef DBGLG
@@ -179,7 +180,7 @@ void *mm_malloc(size_t size)
     /* No fit found. Get more memory and place the block */
     extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
     PRTF("extending heap...\n", 1);
-    char* last_block = epilogue_header - GET_SIZE(epilogue_header - WSIZE) + WSIZE;
+    char* last_block = (char*)get_last_block();
     if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) {
       extendsize -= GET_SIZE(HDRP(last_block));
     }
@@ -290,7 +291,7 @@ static void *extend_heap(size_t words)
     if ((long)(bp = mem_sbrk(size)) == -1)
         return NULL;                                        //line:vm:mm:endextend
 
-    char* last_block = epilogue_header - GET_SIZE(epilogue_header - WSIZE) + WSIZE;
+    char* last_block = (char*)get_last_block();
     if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) {
       size_t oldsize = GET_SIZE(HDRP(last_block));
       PUT(HDRP(last_block), PACK(size + oldsize, 0));
@@ -476,9 +477,9 @@ void *try_merge_realloc(void *bp, size_t size) {
   size_t oldsize = GET_SIZE(HDRP(bp));
   size_t asize = round_size(size);
 
-  /* if (asize <= oldsize) { */
-  /*   return bp; */
-  /* } */
+  if (asize <= oldsize) {
+    return bp;
+  }
 
   /* if (asize < oldsize) { */
   /*   size_t remain_size = oldsize - asize; */
@@ -505,10 +506,6 @@ void *try_merge_realloc(void *bp, size_t size) {
   char *prev_bp = PREV_BLKP(bp);
   char prev_alloc = GET_ALLOC(HDRP(prev_bp));
   size_t prev_size = GET_SIZE(HDRP(prev_bp));
-
-  if (prev_alloc && next_alloc) {
-    return NULL;
-  }
 
   if (!next_alloc && (next_size + oldsize >= asize) && !is_small_block(next_bp)) {
     size_t total_size = next_size + oldsize;
@@ -581,6 +578,21 @@ void *try_merge_realloc(void *bp, size_t size) {
     }
     return prev_bp;
   }
+
+
+  void **last_block = get_last_block();
+  if (last_block == bp) {
+    /* extend by 1 page rather than allocate a whole new block */
+    if ((long)mem_sbrk(CHUNKSIZE) == -1) {
+      return NULL;
+    }
+    PUT(HDRP(bp), PACK(oldsize + CHUNKSIZE, 1));
+    PUT(FTRP(bp), PACK(oldsize + CHUNKSIZE, 1));
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
+    epilogue_header = NEXT_BLKP(bp) - 4;
+    return bp;
+  }
+
   return NULL;
 }
 
@@ -670,4 +682,8 @@ void **partition_block_by_size(void *bp, size_t size) {
   }
   assert(to_return);
   return to_return;
+}
+
+void **get_last_block() {
+  return (void**)(epilogue_header - GET_SIZE(epilogue_header - WSIZE) + WSIZE);
 }
