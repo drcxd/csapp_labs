@@ -79,7 +79,7 @@ team_t team = {
 
 /* Global variables */
 static char *heap_listp = 0;  /* Pointer to first block */
-static char *first_free = 0;
+static void *big_free = 0;
 static char *epilogue_header = 0;
 #ifdef NEXT_FIT
 static char *rover;           /* Next fit rover */
@@ -91,7 +91,7 @@ static void* place(void *bp, size_t asize);
 static void *find_fit(size_t asize);
 static void *coalesce(void *bp);
 static void unlink_blk(void *bp);
-static void insert_front(void *bp);
+static void insert_front(void **headp, void *bp);
 static size_t round_size(size_t size);
 static void *try_merge_realloc(void *bp, size_t size);
 static void printblock(void *bp);
@@ -107,20 +107,25 @@ static void report_heap();
 #define PRTF(fmt, ...)
 #endif
 
+#define SMALL_BLOCK_SIZE 256
+#define SMALL_LIST_SIZE 31 /* 256/8 - 1*/
+
 /*
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
 {
     /* Create the initial empty heap */
-    if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1) //line:vm:mm:begininit
+  if ((heap_listp = mem_sbrk(34*WSIZE)) == (void *)-1) /* 31 + 3 */
         return -1;
-    PUT(heap_listp, 0);                          /* Alignment padding */
-    PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); /* Prologue header */
+  /* PUT(heap_listp, 0);                          /\* Alignment padding *\/ */
+  bzero(heap_listp, SMALL_LIST_SIZE * PSIZE);
+  heap_listp += SMALL_LIST_SIZE * PSIZE - PSIZE;
+  PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); /* Prologue header */
     PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1)); /* Prologue footer */
     PUT(heap_listp + (3*WSIZE), PACK(0, 1));     /* Epilogue header */
     heap_listp += (2*WSIZE);                     //line:vm:mm:endinit
-    first_free = NULL;
+    big_free = NULL;
     epilogue_header = heap_listp + WSIZE;
     /* $end mminit */
 
@@ -197,7 +202,7 @@ void mm_free(void *bp)
 
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
-    insert_front(bp);
+    insert_front(&big_free, bp);
     coalesce(bp);
     report_heap();
 }
@@ -323,7 +328,7 @@ static void *extend_heap(size_t words)
       PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
           /* New epilogue header */ // line:vm:mm:newepihdr
       epilogue_header = NEXT_BLKP(bp) - 4;
-      insert_front(bp);
+      insert_front(&big_free, bp);
       bp = coalesce(bp);
     }
 
@@ -342,7 +347,7 @@ static void *place(void *bp, size_t asize) {
       bp = NEXT_BLKP(bp);
       PUT(HDRP(bp), PACK(csize - asize, 0));
       PUT(FTRP(bp), PACK(csize - asize, 0));
-      insert_front(bp);
+      insert_front(&big_free, bp);
       bp = PREV_BLKP(bp);
     } else {
       PUT(HDRP(bp), PACK(csize, 1));
@@ -382,7 +387,7 @@ static void *find_fit(size_t asize)
     /* } */
     /* return NULL; /\* No fit *\/ */
 
-    void **it = (void**)first_free;
+    void **it = big_free;
     void **best_fit = NULL;
     unsigned best_diff = UINT32_MAX;
     while (it != NULL) {
@@ -462,19 +467,19 @@ void unlink_blk(void *bp) {
   if (next_prev) {
     *next_prev = prev_blk;
   }
-  if (bp == first_free) {
-    first_free = (char *)next_blk;
+  if (bp == big_free) {
+    big_free = next_blk;
   }
   /* check_free_list(); */
 }
 
-void insert_front(void *bp) {
+void insert_front(void **headp, void *bp) {
   PUTP(GETPP(bp), 0);
-  PUTP(GETNP(bp), first_free);
-  if (first_free) {
-    PUTP(GETPP(first_free), bp);
+  PUTP(GETNP(bp), *headp);
+  if (*headp) {
+    PUTP(GETPP(*headp), bp);
   }
-  first_free = bp;
+  *headp = bp;
   /* check_free_list(); */
 }
 
@@ -512,7 +517,7 @@ void *try_merge_realloc(void *bp, size_t size) {
       char *new_next_bp = NEXT_BLKP(bp);
       PUT(HDRP(new_next_bp), PACK(remain_size, 0));
       PUT(FTRP(new_next_bp), PACK(remain_size, 0));
-      insert_front(new_next_bp);
+      insert_front(&big_free, new_next_bp);
       coalesce(new_next_bp);
     } else {
       PUT(HDRP(bp), PACK(oldsize, 1));
@@ -544,7 +549,7 @@ void *try_merge_realloc(void *bp, size_t size) {
       char *new_next_bp = NEXT_BLKP(bp);
       PUT(HDRP(new_next_bp), PACK(remain_size, 0));
       PUT(FTRP(new_next_bp), PACK(remain_size, 0));
-      insert_front(new_next_bp);
+      insert_front(&big_free, new_next_bp);
     } else {
       PUT(HDRP(bp), PACK(total_size, 1));
       PUT(FTRP(bp), PACK(total_size, 1));
@@ -567,7 +572,7 @@ void *try_merge_realloc(void *bp, size_t size) {
       char *new_next_bp = NEXT_BLKP(prev_bp);
       PUT(HDRP(new_next_bp), PACK(remain_size, 0));
       PUT(FTRP(new_next_bp), PACK(remain_size, 0));
-      insert_front(new_next_bp);
+      insert_front(&big_free, new_next_bp);
     } else {
       PUT(HDRP(prev_bp), PACK(total_size, 1));
       PUT(FTRP(prev_bp), PACK(total_size, 1));
@@ -592,7 +597,7 @@ void *try_merge_realloc(void *bp, size_t size) {
       char *new_next_bp = NEXT_BLKP(prev_bp);
       PUT(HDRP(new_next_bp), PACK(remain_size, 0));
       PUT(FTRP(new_next_bp), PACK(remain_size, 0));
-      insert_front(new_next_bp);
+      insert_front(&big_free, new_next_bp);
     } else {
       PUT(HDRP(prev_bp), PACK(total_size, 1));
       PUT(FTRP(prev_bp), PACK(total_size, 1));
