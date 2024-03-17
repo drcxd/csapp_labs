@@ -99,6 +99,9 @@ static void checkheap(int verbose);
 static void checkblock(void *bp);
 /* static void check_free_list(); */
 static void report_heap();
+static char is_small_block(void *bp);
+static void *try_coalesce_with_prev(void *bp);
+static void *try_coalesce_with_next(void *bp);
 
 /* #define DBGLG */
 #ifdef DBGLG
@@ -253,47 +256,9 @@ void *mm_realloc(void *ptr, size_t size)
 
 static void *coalesce(void *bp)
 {
-    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
-    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-    size_t size = GET_SIZE(HDRP(bp));
-
-    if (prev_alloc && next_alloc) {            /* Case 1 */
-        return bp;
-    }
-
-    if (prev_alloc && !next_alloc) {      /* Case 2 */
-      unlink_blk(NEXT_BLKP(bp));
-        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
-        PUT(HDRP(bp), PACK(size, 0));
-        PUT(FTRP(bp), PACK(size,0));
-    }
-
-    else if (!prev_alloc && next_alloc) {      /* Case 3 */
-      unlink_blk(bp);
-        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        PUT(FTRP(bp), PACK(size, 0));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
-    }
-
-    else {                                     /* Case 4 */
-      unlink_blk(NEXT_BLKP(bp));
-      unlink_blk(bp);
-        size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
-            GET_SIZE(FTRP(NEXT_BLKP(bp)));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
-    }
-    /* $end mmfree */
-#ifdef NEXT_FIT
-    /* Make sure the rover isn't pointing into the free block */
-    /* that we just coalesced */
-    if ((rover > (char *)bp) && (rover < NEXT_BLKP(bp)))
-        rover = bp;
-#endif
-    /* $begin mmfree */
-    return bp;
+  bp = try_coalesce_with_next(bp);
+  bp = try_coalesce_with_prev(bp);
+  return bp;
 }
 
 void mm_checkheap(int verbose)
@@ -617,4 +582,42 @@ void report_heap() {
     ++i;
   }
 #endif
+}
+
+char is_small_block(void *bp) {
+  /* return GET_SIZE(HDRP(bp)) <= SMALL_BLOCK_SIZE; */
+  return 0;
+}
+
+void *try_coalesce_with_prev(void *bp) {
+  if (is_small_block(bp)) {
+    return bp;
+  }
+  void *prev = PREV_BLKP(bp);
+  size_t size = GET_SIZE(HDRP(bp));
+  if (!GET_ALLOC(HDRP(prev)) && !is_small_block(prev)) {
+    unlink_blk(bp);
+    size_t prev_size = GET_SIZE(HDRP(prev));
+    size += prev_size;
+    PUT(HDRP(prev), PACK(size, 0));
+    PUT(FTRP(prev), PACK(size, 0));
+    bp = prev;
+  }
+  return bp;
+}
+
+void *try_coalesce_with_next(void *bp) {
+  if (is_small_block(bp)) {
+    return bp;
+  }
+  void *next = NEXT_BLKP(bp);
+  size_t size = GET_SIZE(HDRP(bp));
+  if (!GET_ALLOC(HDRP(next)) && !is_small_block(next)) {
+    unlink_blk(next);
+    size_t next_size = GET_SIZE(HDRP(next));
+    size += next_size;
+    PUT(HDRP(bp), PACK(size, 0));
+    PUT(FTRP(bp), PACK(size, 0));
+  }
+  return bp;
 }
