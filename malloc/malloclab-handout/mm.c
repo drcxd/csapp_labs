@@ -51,6 +51,7 @@ team_t team = {
 #define WSIZE 4
 #define DSIZE 8
 #define CHUNKSIZE (1 << 12)
+#define SMALL_BLOCK_CHUNKSIZE (1 << 12)
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
@@ -177,20 +178,30 @@ void *mm_malloc(size_t size)
       return place(bp, asize);
     }
 
-    /* No fit found. Get more memory and place the block */
-    extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
-    PRTF("extending heap...\n", 1);
-    char* last_block = (char*)get_last_block();
-    if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) {
-      extendsize -= GET_SIZE(HDRP(last_block));
-    }
-    if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
-        return NULL;                                  //line:vm:mm:growheap2
+    /* if small block
+         try allocate from big_free
+         extend heap
+       else if big
+         extend heap
+    */
+
+
     if (asize <= SMALL_BLOCK_SIZE) {
-      /* Partition new allocated block into small blocks and append to
-         the corresponding list */
+      bp = find_fit(SMALL_BLOCK_CHUNKSIZE);
+      if (!bp) {
+        if ((bp = extend_heap(SMALL_BLOCK_CHUNKSIZE/WSIZE)) == NULL) {
+          return NULL;
+        }
+      }
       bp = (char*)partition_block_by_size(bp, asize);
-      assert(GET_SIZE(HDRP(bp)) == asize);
+    } else {
+      extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
+      char *last_block = (char *)get_last_block();
+      if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) {
+        extendsize -= GET_SIZE(HDRP(last_block));
+      }
+      if ((bp = extend_heap(extendsize / WSIZE)) == NULL)
+        return NULL; // line:vm:mm:growheap2
     }
     return place(bp, asize);
 }
