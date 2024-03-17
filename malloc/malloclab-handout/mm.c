@@ -90,7 +90,7 @@ static void *extend_heap(size_t words);
 static void* place(void *bp, size_t asize);
 static void *find_fit(size_t asize);
 static void *coalesce(void *bp);
-static void unlink_blk(void *bp);
+static void unlink_blk(void **headp, void *bp);
 static void insert_front(void **headp, void *bp);
 static size_t round_size(size_t size);
 static void *try_merge_realloc(void *bp, size_t size);
@@ -112,6 +112,7 @@ static void *try_coalesce_with_next(void *bp);
 
 #define SMALL_BLOCK_SIZE 256
 #define SMALL_LIST_SIZE 31 /* 256/8 - 1*/
+void **small_lists = NULL;
 
 /*
  * mm_init - initialize the malloc package.
@@ -121,7 +122,7 @@ int mm_init(void)
     /* Create the initial empty heap */
   if ((heap_listp = mem_sbrk(34*WSIZE)) == (void *)-1) /* 31 + 3 */
         return -1;
-  /* PUT(heap_listp, 0);                          /\* Alignment padding *\/ */
+  small_lists = heap_listp;
   bzero(heap_listp, SMALL_LIST_SIZE * PSIZE);
   heap_listp += SMALL_LIST_SIZE * PSIZE - PSIZE;
   PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); /* Prologue header */
@@ -304,7 +305,7 @@ static void *extend_heap(size_t words)
 
 static void *place(void *bp, size_t asize) {
     size_t csize = GET_SIZE(HDRP(bp));
-    unlink_blk(bp);
+    unlink_blk(&big_free, bp);
 
     if ((csize - asize) >= (2 * DSIZE)) {
       PUT(HDRP(bp), PACK(asize, 1));
@@ -324,35 +325,8 @@ static void *place(void *bp, size_t asize) {
 
 static void *find_fit(size_t asize)
 {
-
-#ifdef NEXT_FIT
-    /* Next fit search */
-    char *oldrover = rover;
-
-    /* Search from the rover to the end of list */
-    for ( ; GET_SIZE(HDRP(rover)) > 0; rover = NEXT_BLKP(rover))
-        if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover))))
-            return rover;
-
-    /* search from start of list to old rover */
-    for (rover = heap_listp; rover < oldrover; rover = NEXT_BLKP(rover))
-        if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover))))
-            return rover;
-
-    return NULL;  /* no fit found */
-#else
-    /* $begin mmfirstfit */
-    /* First-fit search */
-    /* void *bp; */
-
-    /* for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) { */
-    /*     if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) { */
-    /*         return bp; */
-    /*     } */
-    /* } */
-    /* return NULL; /\* No fit *\/ */
-
-    void **it = big_free;
+    void** it;
+    it = big_free;
     void **best_fit = NULL;
     unsigned best_diff = UINT32_MAX;
     while (it != NULL) {
@@ -367,7 +341,6 @@ static void *find_fit(size_t asize)
       it = *(GETNP(it));
     }
     return best_fit;
-#endif
 }
 
 static void printblock(void *bp)
@@ -421,7 +394,7 @@ void checkheap(int verbose)
         printf("Bad epilogue header\n");
 }
 
-void unlink_blk(void *bp) {
+void unlink_blk(void** headp, void *bp) {
   void **prev_blk = *(GETPP(bp));
   void **next_blk = *(GETNP(bp));
   void **prev_next = prev_blk ? GETNP(prev_blk) : NULL;
@@ -432,8 +405,8 @@ void unlink_blk(void *bp) {
   if (next_prev) {
     *next_prev = prev_blk;
   }
-  if (bp == big_free) {
-    big_free = next_blk;
+  if (bp == *headp) {
+    *headp = next_blk;
   }
   /* check_free_list(); */
 }
@@ -505,7 +478,7 @@ void *try_merge_realloc(void *bp, size_t size) {
 
   if (prev_alloc && !next_alloc && (next_size + oldsize >= asize)) {
     size_t total_size = next_size + oldsize;
-    unlink_blk(next_bp);
+    unlink_blk(&big_free, next_bp);
     size_t remain_size = total_size - asize;
     /* if (remain_size >= 2 * DSIZE) { */
     if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) {
@@ -524,7 +497,7 @@ void *try_merge_realloc(void *bp, size_t size) {
   } else if (!prev_alloc && next_alloc && (prev_size + oldsize >= asize)) {
     size_t total_size = prev_size + oldsize;
     size_t remain_size = total_size - asize;
-    unlink_blk(prev_bp);
+    unlink_blk(&big_free, prev_bp);
     if (size < oldsize) {
       oldsize = size;
     }
@@ -547,8 +520,8 @@ void *try_merge_realloc(void *bp, size_t size) {
              (prev_size + next_size + oldsize >= asize)) {
     size_t total_size = prev_size + next_size + oldsize;
     size_t remain_size = total_size - asize;
-    unlink_blk(prev_bp);
-    unlink_blk(next_bp);
+    unlink_blk(&big_free, prev_bp);
+    unlink_blk(&big_free, next_bp);
     if (size < oldsize) {
       oldsize = size;
     }
@@ -596,7 +569,7 @@ void *try_coalesce_with_prev(void *bp) {
   void *prev = PREV_BLKP(bp);
   size_t size = GET_SIZE(HDRP(bp));
   if (!GET_ALLOC(HDRP(prev)) && !is_small_block(prev)) {
-    unlink_blk(bp);
+    unlink_blk(&big_free, bp);
     size_t prev_size = GET_SIZE(HDRP(prev));
     size += prev_size;
     PUT(HDRP(prev), PACK(size, 0));
@@ -613,7 +586,7 @@ void *try_coalesce_with_next(void *bp) {
   void *next = NEXT_BLKP(bp);
   size_t size = GET_SIZE(HDRP(bp));
   if (!GET_ALLOC(HDRP(next)) && !is_small_block(next)) {
-    unlink_blk(next);
+    unlink_blk(&big_free, next);
     size_t next_size = GET_SIZE(HDRP(next));
     size += next_size;
     PUT(HDRP(bp), PACK(size, 0));
