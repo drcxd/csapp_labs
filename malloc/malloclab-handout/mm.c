@@ -51,7 +51,7 @@ team_t team = {
 #define WSIZE 4
 #define DSIZE 8
 #define CHUNKSIZE (1 << 12)
-#define SMALL_BLOCK_CHUNKSIZE (1 << 12)
+#define SMALL_BLOCK_CHUNKSIZE (1 << 10)
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
@@ -114,8 +114,8 @@ static void **get_last_block();
 #define PRTF(fmt, ...)
 #endif
 
-/* #define SMALL_BLOCK_SIZE 256 */
-#define SMALL_BLOCK_SIZE 112
+#define SMALL_BLOCK_SIZE 256
+/* #define SMALL_BLOCK_SIZE 112 */
 #define SMALL_LIST_SIZE 31 /* 256/8 - 1*/
 void **small_lists = NULL;
 
@@ -593,12 +593,12 @@ void *try_merge_realloc(void *bp, size_t size) {
 
   void **last_block = get_last_block();
   if (last_block == bp) {
-    /* extend by 1 page rather than allocate a whole new block */
-    if ((long)mem_sbrk(CHUNKSIZE) == -1) {
+    /* extend on demand */
+    if ((long)mem_sbrk(asize - oldsize) == -1) {
       return NULL;
     }
-    PUT(HDRP(bp), PACK(oldsize + CHUNKSIZE, 1));
-    PUT(FTRP(bp), PACK(oldsize + CHUNKSIZE, 1));
+    PUT(HDRP(bp), PACK(asize, 1));
+    PUT(FTRP(bp), PACK(asize, 1));
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
     epilogue_header = NEXT_BLKP(bp) - 4;
     return bp;
