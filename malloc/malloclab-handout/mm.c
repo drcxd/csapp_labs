@@ -189,7 +189,7 @@ void *mm_malloc(size_t size)
 
 
     if (asize <= SMALL_BLOCK_SIZE) {
-      bp = find_fit(SMALL_BLOCK_CHUNKSIZE);
+      bp = find_fit(SMALL_BLOCK_SIZE + 1);
       if (!bp) {
         if ((bp = extend_heap(SMALL_BLOCK_CHUNKSIZE/WSIZE)) == NULL) {
           return NULL;
