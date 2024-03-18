@@ -100,7 +100,7 @@ static void checkheap(int verbose);
 static void checkblock(void *bp);
 /* static void check_free_list(); */
 static void report_heap();
-/* static char is_small_block(void *bp); */
+static char is_small_block(void *bp);
 static void *try_coalesce_with_prev(void *bp);
 static void *try_coalesce_with_next(void *bp);
 static void **get_list_by_size(size_t size);
@@ -144,6 +144,12 @@ int mm_init(void)
     rover = heap_listp;
 #endif
     /* $begin mminit */
+
+    void** bp;
+    if ((bp = extend_heap(128/WSIZE))) {
+      partition_block_by_size(bp, 32);
+    }
+
 
     /* Extend the empty heap with a free block of CHUNKSIZE bytes */
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
@@ -199,8 +205,8 @@ void *mm_malloc(size_t size)
     } else {
       extendsize = MAX(asize,CHUNKSIZE);                 //line:vm:mm:growheap1
       char *last_block = (char *)get_last_block();
-      /* if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) { */
-      if (!GET_ALLOC(HDRP(last_block))) {
+      if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) {
+      /* if (!GET_ALLOC(HDRP(last_block))) { */
         extendsize -= GET_SIZE(HDRP(last_block));
       }
       if ((bp = extend_heap(extendsize / WSIZE)) == NULL)
@@ -305,8 +311,8 @@ static void *extend_heap(size_t words)
         return NULL;                                        //line:vm:mm:endextend
 
     char* last_block = (char*)get_last_block();
-    /* if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) { */
-    if (!GET_ALLOC(HDRP(last_block))) {
+    if (!GET_ALLOC(HDRP(last_block)) && !is_small_block(last_block)) {
+    /* if (!GET_ALLOC(HDRP(last_block))) { */
       size_t oldsize = GET_SIZE(HDRP(last_block));
       unlink_blk(last_block);
       PUT(HDRP(last_block), PACK(size + oldsize, 0));
@@ -551,58 +557,58 @@ void *try_merge_realloc(void *bp, size_t size) {
   }
 
   /* if (!prev_alloc && (prev_size + oldsize >= asize) && !is_small_block(prev_bp)) { */
-  if (!prev_alloc && (prev_size + oldsize >= asize)) {
-    size_t total_size = prev_size + oldsize;
-    size_t remain_size = total_size - asize;
-    unlink_blk(prev_bp);
-    if (size < oldsize) {
-      oldsize = size;
-    }
-    for (int i = 0; i < oldsize; ++i) {
-      *(prev_bp + i) = *((char*)bp + i);
-    }
-    if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) {
-    /* if (remain_size >= SMALL_BLOCK_SIZE) { */
-      PUT(HDRP(prev_bp), PACK(asize, 1));
-      PUT(FTRP(prev_bp), PACK(asize, 1));
-      char *new_next_bp = NEXT_BLKP(prev_bp);
-      PUT(HDRP(new_next_bp), PACK(remain_size, 0));
-      PUT(FTRP(new_next_bp), PACK(remain_size, 0));
-      insert_front(new_next_bp);
-    } else {
-      PUT(HDRP(prev_bp), PACK(total_size, 1));
-      PUT(FTRP(prev_bp), PACK(total_size, 1));
-    }
-    return prev_bp;
-  }
+  /* if (!prev_alloc && (prev_size + oldsize >= asize)) { */
+  /*   size_t total_size = prev_size + oldsize; */
+  /*   size_t remain_size = total_size - asize; */
+  /*   unlink_blk(prev_bp); */
+  /*   if (size < oldsize) { */
+  /*     oldsize = size; */
+  /*   } */
+  /*   for (int i = 0; i < oldsize; ++i) { */
+  /*     *(prev_bp + i) = *((char*)bp + i); */
+  /*   } */
+  /*   if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) { */
+  /*   /\* if (remain_size >= SMALL_BLOCK_SIZE) { *\/ */
+  /*     PUT(HDRP(prev_bp), PACK(asize, 1)); */
+  /*     PUT(FTRP(prev_bp), PACK(asize, 1)); */
+  /*     char *new_next_bp = NEXT_BLKP(prev_bp); */
+  /*     PUT(HDRP(new_next_bp), PACK(remain_size, 0)); */
+  /*     PUT(FTRP(new_next_bp), PACK(remain_size, 0)); */
+  /*     insert_front(new_next_bp); */
+  /*   } else { */
+  /*     PUT(HDRP(prev_bp), PACK(total_size, 1)); */
+  /*     PUT(FTRP(prev_bp), PACK(total_size, 1)); */
+  /*   } */
+  /*   return prev_bp; */
+  /* } */
 
-  if (!prev_alloc && !next_alloc &&
-      (prev_size + next_size + oldsize >= asize)) {
-    return NULL;
-    size_t total_size = prev_size + next_size + oldsize;
-    size_t remain_size = total_size - asize;
-    unlink_blk(prev_bp);
-    unlink_blk(next_bp);
-    if (size < oldsize) {
-      oldsize = size;
-    }
-    for (int i = 0; i < oldsize; ++i) {
-      *(prev_bp + i) = *((char*)bp + i);
-    }
-    /* if (remain_size >= 2*DSIZE) { */
-    if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) {
-      PUT(HDRP(prev_bp), PACK(asize, 1));
-      PUT(FTRP(prev_bp), PACK(asize, 1));
-      char *new_next_bp = NEXT_BLKP(prev_bp);
-      PUT(HDRP(new_next_bp), PACK(remain_size, 0));
-      PUT(FTRP(new_next_bp), PACK(remain_size, 0));
-      insert_front(new_next_bp);
-    } else {
-      PUT(HDRP(prev_bp), PACK(total_size, 1));
-      PUT(FTRP(prev_bp), PACK(total_size, 1));
-    }
-    return prev_bp;
-  }
+  /* if (!prev_alloc && !next_alloc && */
+  /*     (prev_size + next_size + oldsize >= asize)) { */
+  /*   return NULL; */
+  /*   size_t total_size = prev_size + next_size + oldsize; */
+  /*   size_t remain_size = total_size - asize; */
+  /*   unlink_blk(prev_bp); */
+  /*   unlink_blk(next_bp); */
+  /*   if (size < oldsize) { */
+  /*     oldsize = size; */
+  /*   } */
+  /*   for (int i = 0; i < oldsize; ++i) { */
+  /*     *(prev_bp + i) = *((char*)bp + i); */
+  /*   } */
+  /*   /\* if (remain_size >= 2*DSIZE) { *\/ */
+  /*   if ((total_size / remain_size) <= SPLIT_RATIO && remain_size >= 2*DSIZE) { */
+  /*     PUT(HDRP(prev_bp), PACK(asize, 1)); */
+  /*     PUT(FTRP(prev_bp), PACK(asize, 1)); */
+  /*     char *new_next_bp = NEXT_BLKP(prev_bp); */
+  /*     PUT(HDRP(new_next_bp), PACK(remain_size, 0)); */
+  /*     PUT(FTRP(new_next_bp), PACK(remain_size, 0)); */
+  /*     insert_front(new_next_bp); */
+  /*   } else { */
+  /*     PUT(HDRP(prev_bp), PACK(total_size, 1)); */
+  /*     PUT(FTRP(prev_bp), PACK(total_size, 1)); */
+  /*   } */
+  /*   return prev_bp; */
+  /* } */
 
 
   void **last_block = get_last_block();
@@ -635,10 +641,10 @@ void report_heap() {
 #endif
 }
 
-/* char is_small_block(void *bp) { */
-/*   return GET_SIZE(HDRP(bp)) <= SMALL_BLOCK_SIZE; */
-/*   /\* return 0; *\/ */
-/* } */
+char is_small_block(void *bp) {
+  return GET_SIZE(HDRP(bp)) <= SMALL_BLOCK_SIZE;
+  /* return 0; */
+}
 
 void *try_coalesce_with_prev(void *bp) {
   /* if (is_small_block(bp)) { */
@@ -646,6 +652,7 @@ void *try_coalesce_with_prev(void *bp) {
   /* } */
   void *prev = PREV_BLKP(bp);
   size_t size = GET_SIZE(HDRP(bp));
+  if (is_small_block(bp) != is_small_block(prev)) { return bp; }
   /* if (!GET_ALLOC(HDRP(prev)) && !is_small_block(prev)) { */
   if (!GET_ALLOC(HDRP(prev))) {
     size_t prev_size = GET_SIZE(HDRP(prev));
@@ -688,7 +695,7 @@ void **get_list_by_size(size_t size) {
 
 void **partition_block_by_size(void *bp, size_t size) {
   size_t bsize = GET_SIZE(HDRP(bp));
-  assert(bsize >= SMALL_BLOCK_SIZE);
+  /* assert(bsize >= SMALL_BLOCK_SIZE); */
   unlink_blk(bp);
 
   if (bsize > SMALL_BLOCK_CHUNKSIZE && bsize - SMALL_BLOCK_CHUNKSIZE >= 2*DSIZE) {
