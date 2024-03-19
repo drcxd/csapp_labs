@@ -207,36 +207,103 @@ Total          78%  112372  0.150440   747
 Perf index = 47 (util) + 40 (thru) = 87/100
 #+end_example
 
-** Dedicated Small Blocks
+** Small Blocks
 
-I want to try implement another solution of malloc:
+Further investigation on the later four trace files indicates that the
+bad utilization is the result of small allocated blocks prevent large
+chunks of memory getting reused. For example, in trace file 7, the
+application allocates blocks of sizes of 64 bytes and 448 bytes one
+after another. Then it frees all the blocks of size of 448 bytes and
+allocates blocks of size of 512 bytes. Due to the blocks of size of 64
+bytes are still allocated, the free blocks of 448 bytes can not be
+coalesced and reused.
 
-small blocks (whose allocated size is smaller than 256) use dedicated
-blocks of exact size. The free blocks are stored in a explicit list
-and. These small blocks never coalesce with other blocks. However, how
-many such blocks should be allocated when the first request for such
-blocks appear? Let's first assume the number is K.
+To improve memory utilization on such patterns, we can allocate not
+one but many small blocks of the same size, when the application
+requests for one such block. This places small blocks of the same size
+together and when they are freed, they can be coalesced and the memory
+can be reused to allocate larger blocks.
 
-Currently, the minimal block size is 16 bytes, and all allocated
-blocks' sizes should be a multiple of 8. Thus, we have 16, 24, ...,
-256, total (256/8)-1 =31 different sizes.
-
-The start of the list for each size should be stored at the beginning
-of the heap, initially set to NULL.
-
-When there is no free small blocks of certain size, we have to
-allocate K new blocks of such size, add it to the list, then return
-one of the newly created block.
-
-** Reuse Dedicated Small Blocks
-
-When dedicated small blocks can handle interleaved allocation of
-different sizes of small blocks, it causes the problem that large
-chunks of dedicated small blocks can not be reused when they are free.
-
-After a dedicated small block is freed, we can check if all the other
-dedicated small blocks of the same size that belongs to the same
-larger block are all freed, and if so, we can reuse the whole larger
+When the allocator creates such small blocks, it can use an existing
+free, big block, or it can extend the heap to create a new free, big
 block.
 
+** Optimize =realloc=
 
+Finally, two specific optimization for =realloc= is made.
+
+1. When a block is reallocated to the same or smaller size, the
+   allocator does not change the allocated size of this block and
+   return the original pointer intact.
+2. When the block locates at the end of the heap gets reallocated to a
+   larger size, the allocator simply extends the heap accordingly so
+   there is exactly enough space to hold the larger block.
+
+
+With the implementation of small blocks and optimization for =realloc=,
+the result is:
+
+#+begin_example
+Results for mm malloc:
+trace  valid  util     ops      secs  Kops
+ 0       yes   99%    5694  0.000184 30979
+ 1       yes   99%    5848  0.000202 28950
+ 2       yes   99%    6648  0.000269 24668
+ 3       yes  100%    5380  0.000242 22231
+ 4       yes   98%   14400  0.000225 63915
+ 5       yes   96%    4800  0.002080  2307
+ 6       yes   95%    4800  0.001951  2461
+ 7       yes   96%   12000  0.000740 16212
+ 8       yes   89%   24000  0.000580 41351
+ 9       yes   99%   14401  0.000302 47638
+10       yes   85%   14401  0.000291 49522
+Total          96%  112372  0.007068 15900
+
+Perf index = 58 (util) + 40 (thru) = 98/100
+#+end_example
+
+** A Final Trick
+
+Note that the memory utilization of the last trace file is still
+relatively low. Observing the pattern, I have discovered that, even
+with the help of smaller blocks, there is still small blocks
+preventing large blocks being reused. To improve on such cases, I make
+the allocator allocates a small piece of memory after initialization
+and this piece of memory is specifically prepared for small blocks.
+
+I also prevented small blocks coalesce with previous large blocks, or
+large blocks coalesce with previous smaller blocks. The allocator is
+also not allowed to take advantage of the last free block when
+extending the heap, if that block is a small block. Though these last
+two tricks are highly trace-specific optimization and may not be used
+in a real memory allocator.
+
+Anyway, the final result:
+
+#+begin_example
+Results for mm malloc:
+trace  valid  util     ops      secs  Kops
+ 0       yes   99%    5694  0.000716  7948
+ 1       yes   99%    5848  0.000938  6235
+ 2       yes   99%    6648  0.001062  6259
+ 3       yes   99%    5380  0.001046  5142
+ 4       yes   97%   14400  0.000735 19597
+ 5       yes   95%    4800  0.002918  1645
+ 6       yes   95%    4800  0.002861  1678
+ 7       yes   95%   12000  0.001417  8469
+ 8       yes   89%   24000  0.001629 14729
+ 9       yes   98%   14401  0.000732 19687
+10       yes   99%   14401  0.000726 19825
+Total          97%  112372  0.014781  7602
+
+Perf index = 58 (util) + 40 (thru) = 98/100
+#+end_example
+
+* Final Comments
+
+After all I have to admit, it is not an easy task to develop a memory
+allocator. Even if such a toy allocator is not simple, not to mention
+the product quality ones. Also, configurations on memory allocator
+also have huge impact on the overall performance of the
+allocator. Thus, may be it is better to keep away from memory
+allocators as far as possible.
