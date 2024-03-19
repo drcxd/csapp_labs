@@ -1,5 +1,213 @@
+#+TITLE: Comment On the malloc Lab
+#+AUTHOR: Chang Xiaoduan
 
-* Dedicated Small Blocks
+My result of the lab:
+
+#+begin_example
+Using default tracefiles in traces/
+Measuring performance with gettimeofday().
+
+Results for mm malloc:
+trace  valid  util     ops      secs  Kops
+ 0       yes   99%    5694  0.000295 19334
+ 1       yes   99%    5848  0.000439 13324
+ 2       yes   99%    6648  0.000497 13368
+ 3       yes   99%    5380  0.000525 10250
+ 4       yes   97%   14400  0.000237 60683
+ 5       yes   95%    4800  0.002718  1766
+ 6       yes   95%    4800  0.002068  2321
+ 7       yes   95%   12000  0.001074 11176
+ 8       yes   89%   24000  0.000648 37014
+ 9       yes   99%   14401  0.000876 16441
+10       yes   99%   14401  0.000307 46833
+Total          97%  112372  0.009685 11603
+
+Perf index = 58 (util) + 40 (thru) = 98/100
+#+end_example
+
+In this article, I will first give some personal comment on the lab,
+the way to solving it and achieving a high mark. Then, I will explain
+what I have done to improve the performance of the memory allocator
+and why I have done it.
+
+* General Comment
+
+** On the Style of the Code
+
+The code on the text book use macros to manipulate the information
+stored in the memory alloator. Actually, there is better and less
+error-prone ways of doing this: using explicit data structures and
+helper functions.
+
+For example, to get if a block is allocated, the original code in the
+lab is:
+
+#+begin_src C
+  #define GET(p)       (*(unsigned int *)(p))
+  #define HDRP(bp)       ((char *)(bp) - WSIZE)
+  #define GET_ALLOC(p) (GET(p) & 0x1)
+
+  GET_ALLOC(HDRP(bp));
+#+end_src
+
+It can also be done in the following way:
+
+#+begin_src C
+  struct header_t {
+    int size: 29;
+    int bit2: 1;
+    int bit1: 1;
+    int alloc: 1;
+  };
+
+  struct header_t *get_header(void **bp) {
+    return (header_t)(bp - 1);
+  }
+
+  char get_alloc(void **bp) {
+    return get_header(bp)->alloc;
+  }
+#+end_src
+
+I prefer the second method, since it explicit its idea more explicitly
+and clearly. Also, the data structure can be utilized in other
+ways. In my solution, I choose to comply with the existing code,
+because in practice, you do not always has the chance to re-write all
+the existing code.
+
+** On Improving the Performance
+
+Since the allocator is only tested on a given set of trace files, then
+optimizations aiming particular on these trace files seems
+inevitable. However, I still insist that no specific optimizations
+should be made, only to improve the scores. The correct methodology of
+optimization should be examining the traces that yields bad
+performance and see if there is any general technique that can
+optimize this and other similar allocating patterns that leads to the
+same problem. For example, I have seen a solution contains the
+following code:
+
+#+begin_src C
+  /* Check if split free block from the back of the old block */
+  #define SPLIT_BACK(asize, next_size) (asize < 96 || next_size < 48)
+
+  if (trivial_split || SPLIT_BACK(asize, next_size)) {
+    /* ... */
+  }
+#+end_src
+
+The magic number =96= and =48= looks like specific optimizations for
+certain traces and may cause bad performance when used on other
+allocating patterns. Actually, I have also found such specific
+"optimization" yields better utilization score on the given trace
+files, but I finally give up that solution and developed another more
+general one.
+
+** Final Comment on Memory Allocator
+
+Though I have just criticized specific optimization for certain trace
+files, in practice, such optimizations sometimes are inevitable. For
+example, given the same memory allocator and allocating patterns,
+different chunk sizes yield different performance. Is tuning such
+configures specific optimization and should be avoided? I can not say
+"yes" to this question with certainty, so please use your own
+judgment.
+
+* Optimizations
+
+** Explicit List
+
+The first change I do to the allocator is to implement it using
+explicit list rather than implicit list. Explicit list is explained in
+the text book and I implemented it without further modification, so I
+will not do further explanation here.
+
+Result after implementing explicit list:
+
+#+begin_example
+Results for mm malloc:
+trace  valid  util     ops      secs  Kops
+ 0       yes   88%    5694  0.000201 28286
+ 1       yes   92%    5848  0.000124 47314
+ 2       yes   95%    6648  0.000313 21219
+ 3       yes   97%    5380  0.000206 26129
+ 4       yes   66%   14400  0.000113127660
+ 5       yes   90%    4800  0.000493  9732
+ 6       yes   88%    4800  0.000593  8097
+ 7       yes   54%   12000  0.002258  5315
+ 8       yes   47%   24000  0.002425  9897
+ 9       yes   27%   14401  0.055837   258
+10       yes   30%   14401  0.001992  7230
+Total          70%  112372  0.064555  1741
+
+Perf index = 42 (util) + 40 (thru) = 82/100
+#+end_example
+
+** Best Fit
+
+Since we already get the max score for throughput, we can try
+sacrifice it for more utilization. An easy modification is to switch
+from first fit to best fit.
+
+Result:
+
+#+begin_example
+Results for mm malloc:
+trace  valid  util     ops      secs  Kops
+ 0       yes   99%    5694  0.000131 43432
+ 1       yes   99%    5848  0.000170 34339
+ 2       yes   99%    6648  0.000176 37730
+ 3       yes   99%    5380  0.000197 27365
+ 4       yes   66%   14400  0.000223 64719
+ 5       yes   95%    4800  0.002901  1655
+ 6       yes   94%    4800  0.002665  1801
+ 7       yes   54%   12000  0.016257   738
+ 8       yes   47%   24000  0.063506   378
+ 9       yes   25%   14401  0.056767   254
+10       yes   30%   14401  0.002048  7031
+Total          74%  112372  0.145041   775
+
+Perf index = 44 (util) + 40 (thru) = 84/100
+#+end_example
+
+Best fit does not improve the overall performance much, so we have to
+inspect the trace files and see what causes the bad utilization.
+
+** Extending Heap Flexibly
+
+By examining trace file 4 and the status of the heap, I have found
+that the 66% utilization comes from the fact that the allocator always
+extends heap 4096 bytes once. Thus, if the application allocates for a
+total of memory a little bit higher than 2 \times 4096 bytes, then the
+allocator will take 3 \times 4096 bytes from the heap and about one third
+of the memory is wasted.
+
+To fix this problem, we can check if the last block we have created is
+free, and if so, we minus the size of the block from the size the
+allocator takes from the heap.
+
+The result:
+
+#+begin_example
+Results for mm malloc:
+trace  valid  util     ops      secs  Kops
+ 0       yes   99%    5694  0.000209 27270
+ 1       yes  100%    5848  0.000218 26813
+ 2       yes   99%    6648  0.000214 31124
+ 3       yes  100%    5380  0.000131 41194
+ 4       yes  100%   14400  0.000204 70554
+ 5       yes   96%    4800  0.002641  1817
+ 6       yes   95%    4800  0.002546  1885
+ 7       yes   55%   12000  0.017710   678
+ 8       yes   51%   24000  0.067352   356
+ 9       yes   25%   14401  0.057402   251
+10       yes   33%   14401  0.001813  7944
+Total          78%  112372  0.150440   747
+
+Perf index = 47 (util) + 40 (thru) = 87/100
+#+end_example
+
+** Dedicated Small Blocks
 
 I want to try implement another solution of malloc:
 
@@ -20,7 +228,7 @@ When there is no free small blocks of certain size, we have to
 allocate K new blocks of such size, add it to the list, then return
 one of the newly created block.
 
-* Reuse Dedicated Small Blocks
+** Reuse Dedicated Small Blocks
 
 When dedicated small blocks can handle interleaved allocation of
 different sizes of small blocks, it causes the problem that large
@@ -30,3 +238,5 @@ After a dedicated small block is freed, we can check if all the other
 dedicated small blocks of the same size that belongs to the same
 larger block are all freed, and if so, we can reuse the whole larger
 block.
+
+
