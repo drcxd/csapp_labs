@@ -1,0 +1,12 @@
+curl --max-time 5 --silent --proxy http://localhost:proxy_port http://localhost:server_port/file
+
+sample
+
+#+begin_example
+GET http://localhost:4501/home.html HTTP/1.1
+Host: localhost:4501
+User-Agent: curl/8.5.0
+Accept: */*
+Proxy-Connection: Keep-Alive
+
+#+end_example
