@@ -1,4 +1,5 @@
 curl --max-time 5 --silent --proxy http://localhost:proxy_port http://localhost:server_port/file
+curl --max-time 5 --silent --proxy http://localhost:4500 http://localhost:server_port/home.html
 
 sample
 
@@ -10,3 +11,17 @@ Accept: */*
 Proxy-Connection: Keep-Alive
 
 #+end_example
+
+Basically, this lab is very flexible. The auto-grade script =driver.sh=
+does not test the program thoroughly. For example, it does not check
+if the program can correctly handle explicit and implicit port. It
+does not check if the program correctly handle different HTTP method
+(GET, POST, etc.).
+
+For the cache part, it does not test race condition, and the behavior
+of the cache. Actually, the behavior of the cache is only specified
+vaguely in the write-up.
+
+Thus, I tightly implemented what the driver tests. This is not good,
+but the project seems not worth that much time to me now. It's merely
+software engineering effort.

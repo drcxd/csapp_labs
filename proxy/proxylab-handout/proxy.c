@@ -130,12 +130,11 @@ void *serve(void *arg) {
 }
 
 cache_node_t *get_from_cache(char *host, char *port, char *file) {
-  return NULL;
   cache_node_t *it = cache_head;
   char id[CACHE_ID_SIZE];
   snprintf(id, CACHE_ID_SIZE, "%s:%s%s", host, port, file);
   while (it != NULL) {
-    if (strcmp(it->identifier, id)) {
+    if (!strcmp(it->identifier, id)) {
       break;
     }
     it = it->next;
@@ -144,8 +143,6 @@ cache_node_t *get_from_cache(char *host, char *port, char *file) {
 }
 
 void add_to_cache(char* host, char* port, char* file, char* data, size_t size) {
-  free(data);
-  return;
   cache_node_t *node = get_from_cache(host, port, file);
   if (node != NULL) {
     /* touch node */
