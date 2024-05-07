@@ -1,0 +1,5 @@
+The =master= branch contains the original lab materials.
+
+The =solution= branch contains my solution for these labs. In each lab's
+directory, there is a =solution.org= which contains my comments on the
+lab and the solution.
